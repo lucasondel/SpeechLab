@@ -1,0 +1,26 @@
+# Lucas Ondel 2021
+#
+# Mel Frequency Celpstral Coefficients (MFCCS) configuration file.
+
+featype = "MFCC"
+removedc = true
+dithering = 0
+srate = 8000
+frameduration = 0.025
+framestep = 0.01
+preemphasis = 0.97
+windowfn = "hann"
+windowpower = 0.85
+nfilters = 24
+lofreq = 64
+hifreq = 3800
+addenergy = true
+nceps = 12
+liftering = 22
+
+[DeltaCoeffs]
+order = 2
+deltawin = 2
+
+[Normalization]
+mean_norm = true

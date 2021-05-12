@@ -1,0 +1,18 @@
+# 3-state HMM topology.
+
+states = [
+    { id = 1, initweight = 1.0, finalweight = 0.0 },
+    { id = 2, initweight = 0.0, finalweight = 0.0 },
+    { id = 3, initweight = 0.0, finalweight = 1.0 }
+]
+
+links = [
+    { src = 1, dest = 1, weight = 0.5 },
+    { src = 1, dest = 2, weight = 0.5 },
+    { src = 2, dest = 2, weight = 0.5 },
+    { src = 2, dest = 3, weight = 0.5 },
+    { src = 3, dest = 3, weight = 1.0 }
+]
+
+# If true, all states will have the same pdf.
+tiestates = false
