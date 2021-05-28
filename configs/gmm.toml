@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+
+[model]
+ncomponents = 500
+covtype = "diagonal" # "full" | "diagonal"
+priortype = "categorical" # "categorical" | "stick-breaking"
+
+[inference]
+steps = 100
+learning_rate = 1e-3
+mini_batch_size = 600 # numbers of utterances per mini-batch
