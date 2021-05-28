@@ -1,4 +1,4 @@
-# Lucas Ondel 2021 LISN
+# SPDX-License-Identifier: MIT
 
 using ArgParse
 using BSON
