@@ -65,10 +65,11 @@ subsets="dev-clean dev-other test-clean test-other train-clean-100 train-clean-3
 for subset in $subsets; do
 
     subsetdir=$localdir/corpus/LibriSpeech/$subset
-    if [ ! -f $subsetdir/.done ]; then
+    sdir=$odir/$subset
+    if [ ! -f $sdir/.done ]; then
         echo preparing subset: $subset
 
-        sdir=$odir/$subset
+
         mkdir -p $sdir
 
         rm -f $sdir/wav.scp
@@ -82,18 +83,20 @@ for subset in $subsets; do
                 find -L $chapter_dir/ -iname "*.flac" | \
                     sort | \
                     xargs -I% basename % .flac | \
-                    awk -v "dir=$chapter_dir" '{printf "lbi-%s flac -c -d -s %s/%s.flac |\n", $0, dir, $0}' \
+                    awk -v "dir=$chapter_dir" '{printf "lbi-%s\tflac -c -d -s %s/%s.flac |\n", $0, dir, $0}' \
                     >> $sdir/wav.scp || exit 1;
 
                 chapter_trans=$chapter_dir/${reader}-${chapter}.trans.txt
-                sed -e 's/^/lbi\-/' $chapter_trans >> $sdir/trans.wrd
+                sed -e 's/^/lbi\-/' $chapter_trans | sed -e 's/ /\t/' >> $sdir/trans.wrd
 
-                awk -v "reader=$reader" -v "chapter=$chapter" '{printf "lbi-%s lbi-%s-%s\n", $1, reader, chapter}' \
+                awk -v "reader=$reader" -v "chapter=$chapter" '{printf "lbi-%s\tlbi-%s-%s\n", $1, reader, chapter}' \
                     <$chapter_trans >> $sdir/utt2spk || exit 1
-
             done
         done
-        date > $subsetdir/.done
+
+        cut -f1 $sdir/wav.scp > $sdir/uttids
+
+        date > $sdir/.done
     else
         echo "$subset is already prepared"
     fi
@@ -102,13 +105,18 @@ done
 if [ ! -f $odir/train-all/.done ]; then
     echo preparing subset: train-all
     mkdir -p $odir/train-all
+
     cat $odir/train-clean-100/wav.scp > $odir/train-all/wav.scp
     cat $odir/train-clean-360/wav.scp >> $odir/train-all/wav.scp
     cat $odir/train-other-500/wav.scp >> $odir/train-all/wav.scp
 
-    cat $odir/train-clean-100/wav.scp > $odir/train-all/utt2spk
-    cat $odir/train-clean-360/wav.scp >> $odir/train-all/utt2spk
-    cat $odir/train-other-500/wav.scp >> $odir/train-all/utt2spk
+    cat $odir/train-clean-100/uttids > $odir/train-all/uttids
+    cat $odir/train-clean-360/uttids >> $odir/train-all/uttids
+    cat $odir/train-other-500/uttids >> $odir/train-all/uttids
+
+    cat $odir/train-clean-100/utt2spk > $odir/train-all/utt2spk
+    cat $odir/train-clean-360/utt2spk >> $odir/train-all/utt2spk
+    cat $odir/train-other-500/utt2spk >> $odir/train-all/utt2spk
 
     date > $odir/train-all/.done
 else
