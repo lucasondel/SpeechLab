@@ -18,7 +18,7 @@ $(FEA_DIR)/.done: $(FEA_CONFIG)
 	@echo Extracting features for the $(DATASET) set.
 	@echo -------------------------------------------------------------
 	mkdir -p $(FEA_DIR)
-	$(JULIA) $(SCRIPTS)/features.jl \
+	$(JULIA) scripts/features.jl \
 		--parallel-njobs $(FEA_PARALLEL_NJOBS) \
 		--parallel-args $(FEA_PARALLEL_ARGS) \
 		$(FEA_CONFIG) \
