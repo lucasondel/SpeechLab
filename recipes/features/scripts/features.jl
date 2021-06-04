@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 
 using ArgParse
-using BSON
-using ClusterManagers
-using Distributed
+using HDF5
 using SpeechFeatures
 using TOML
 using WAV
@@ -66,26 +64,40 @@ const DEFAULTS_NORM = Dict(
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
-        "--parallel-njobs", "-n"
-            default = 1
+        "--compression-level", "-c"
             arg_type = Int
-            help = "number of parallel jobs to use"
-        "--parallel-args", "-a"
-            default = ""
-            arg_type = String
-            help = "arguments to the parallel environment"
+            default = 0
+            help = "compression level of the HDF5 archive"
         "configfile"
             help = "features configuration file (TOML format)"
         "scp"
             help = "SCP file to extract the features"
-        "outdir"
-            help = "output directory where to store the feature files"
+        "out"
+            help = "output HDF5 archive"
     end
     parse_args(s)
 end
 
-function main(args)
-    conf = merge(DEFAULTS, TOML.parsefile(args["configfile"]))
+loadpath(path) = wavread(path, format = "double")
+
+loadpipe(pipe) = channels, srate = wavread(IOBuffer(read(cmd)))
+function loadpipe(pipe)
+    subcmds = [`$(split(subcmd))` for subcmd in split(pipe[1:end-1], "|")]
+    cmd = pipeline(subcmds...)
+    wavread(IOBuffer(read(cmd)))
+end
+
+load(path_or_pipe) =
+    endswith(path_or_pipe, "|") ? loadpipe(path_or_pipe) : loadpath(path_or_pipe)
+
+function load_scpentry(line)
+    tokens = split(strip(line))
+    uttid = tokens[1]
+    path_or_pipe = join(tokens[2:end], " ")
+    String(uttid), path_or_pipe
+end
+
+function buildextractor(conf)
     featype, options = FEATYPES[conf["featype"]]
     feaopts = Dict()
     for opt in options
@@ -111,48 +123,42 @@ function main(args)
         end
     end
 
-    @info "extracting features to $(args["outdir"])..."
+    feaextractor
+end
 
-    @everywhere args = $args
-    @everywhere conf = $conf
-    @everywhere feaextractor = $feaextractor
+function main(args)
+    conf = merge(DEFAULTS, TOML.parsefile(args["configfile"]))
+    feaextractor = buildextractor(conf)
 
-    @sync @distributed for line in readlines(args["scp"])
-        tokens = split(strip(line))
-        uttid = tokens[1]
-        path_or_pipe = join(tokens[2:end], " ")
-        channels, srate = load(path_or_pipe)
+    @debug "extracting features to $(args["out"])"
 
-        # Check that we can process the input
-        srate == conf["srate"] || error("invalid sampling rate, expected $(conf["srate"]) got $srate")
-        size(channels, 2) == 1 || error("cannot process more than 1 channel")
+    h5open(args["out"], "w") do f
 
-        fea = channels[:,1] |> feaextractor
-        outpath = joinpath(args["outdir"], "$(uttid).bson")
-        bson(outpath, Dict(:config => conf, :data => fea))
+        for (key, val) in conf
+            if typeof(val) <: Dict
+                for (skey, sval) in val
+                    attributes(f)["$key.$skey"] = sval
+                end
+            else
+                attributes(f)[key] = val
+            end
+        end
+
+        for line in readlines(args["scp"])
+            @debug "processing $line"
+            uttid, path_or_pipe = load_scpentry(line)
+            channels, srate = load(path_or_pipe)
+
+            @assert srate == conf["srate"]
+            @assert size(channels, 2) == 1
+
+            fea = channels[:,1] |> feaextractor
+
+            f[uttid, compress = args["compression-level"]] = fea
+        end
     end
 end
 
 args = parse_commandline()
-
-@info "starting jobs..."
-# Convert the string arguments to a Cmd object.
-pargs = Cmd([String(token) for token in split(args["parallel-args"])])
-addprocs_sge(args["parallel-njobs"], qsub_flags = pargs, exename = split("stdbuf -oL $(Sys.BINDIR)/julia"))
-@info "started $(nworkers())/$(args["parallel-njobs"]) jobs"
-
-@everywhere using BSON
-@everywhere using SpeechFeatures
-@everywhere using WAV
-
-@everywhere loadpath(path) = wavread(path, format = "double")
-
-@everywhere loadpipe(pipe) = channels, srate = wavread(IOBuffer(read(cmd)))
-@everywhere function loadpipe(pipe)
-    cmd = pipeline([`$(split(subcmd))` for subcmd in split(pipe[1:end-1], "|")]...)
-    wavread(IOBuffer(read(cmd)))
-end
-@everywhere load(path_or_pipe) = endswith(path_or_pipe, "|") ? loadpipe(path_or_pipe) : loadpath(path_or_pipe)
-
 main(args)
 
