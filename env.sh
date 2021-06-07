@@ -7,3 +7,4 @@
 SLAB_ROOT=~/SpeechLab
 SLAB_DATASETS=~/Datasets
 SLAB_FEATURES=~/Features
+SLAB_MODELS=~/Models
