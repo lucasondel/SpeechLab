@@ -3,6 +3,9 @@
 cmd=$0
 root=$(dirname $(dirname $(dirname $(realpath $cmd))))
 . $root/env.sh
+. $root/utils/utils.sh
+
+. ./parallel_env.sh
 
 #######################################################################
 # Defaults
@@ -61,10 +64,8 @@ feaname=${bname%%.*}
 out=$odir/$feaname.h5
 
 scp=$datasetdir/wav.scp
-if [ ! -f $scp ]; then
-    echo "missing file: $scp" 1>&2
-    exit 1
-fi
+
+assert_not_missing $scp
 
 echo extracting features from $scp to $out
 
@@ -75,7 +76,6 @@ cd $tmp
 split -n l/$njobs $scp --numeric-suffixes=1
 cd $cwd
 
-parallel_cmd="qsub -sync y -N fea-extract -V -S /bin/bash -cwd -b y -j y -t 1:$njobs"
 $parallel_cmd julia --project scripts/features.jl \
     -c $compression \
     conf/mfcc_d_dd_16kHz.toml \
