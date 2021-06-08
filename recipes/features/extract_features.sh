@@ -65,10 +65,10 @@ out=$odir/$feaname.h5
 scp=$datasetdir/wav.scp
 assert_not_missing $scp
 
-#if [ -f $out ]; then
-#    echo "The features are already extracted ($out)."
-#    exit 0
-#fi
+if [ -f $out ]; then
+    echo "The features are already extracted ($out)."
+    exit 0
+fi
 
 echo extracting features from $scp to $out
 
@@ -77,13 +77,14 @@ trap 'rm -fr "$tmp"; trap - EXIT; exit' EXIT INT HUP
 cwd=$(pwd)
 cd $tmp
 split -n l/$njobs $scp --numeric-suffixes=1
+rename 's/x0+/x/' x*
 cd $cwd
 
-. parallel_env.sh
+. ./parallel_env.sh
 $parallel_cmd julia --project $SLAB_ROOT/recipes/features/scripts/features.jl \
     -c $compression \
     conf/mfcc_d_dd_16kHz.toml \
-    $tmp/x*\$SGE_TASK_ID \
+    $tmp/x\$SGE_TASK_ID \
     $tmp/\$SGE_TASK_ID.h5
 
 julia --project $SLAB_ROOT/recipes/features/scripts/concat.jl \

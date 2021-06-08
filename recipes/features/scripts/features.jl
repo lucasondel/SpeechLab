@@ -69,10 +69,13 @@ function parse_commandline()
             default = 0
             help = "compression level of the HDF5 archive"
         "configfile"
+            required = true
             help = "features configuration file (TOML format)"
         "scp"
+            required = true
             help = "SCP file to extract the features"
         "out"
+            required = true
             help = "output HDF5 archive"
     end
     parse_args(s)
@@ -159,6 +162,8 @@ function main(args)
     end
 end
 
+run(`hostname`)
+println(ARGS)
 args = parse_commandline()
 main(args)
 
