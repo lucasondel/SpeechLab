@@ -4,7 +4,7 @@
 
 assert_not_missing() {
     if [ ! -f $1 ]; then
-        echo "missing file: $1" 1>&2
+        echo "Missing file: $1." 1>&2
         exit 1
     fi
 }

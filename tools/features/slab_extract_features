@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 cmd=$(basename $0)
-SLAB_ROOT=../..
-. $SLAB_ROOT/utils/utils.sh
+. $SLAB_ROOT/tools/utils/utils.sh
 
 #######################################################################
 # Defaults
@@ -34,7 +33,7 @@ while :; do
         -h) show_help; exit 0;;
         -n) njobs=$2; shift;;
         -*)
-            echo "unknown option: $1. Try '$0 -h' for more informations."  1>&2
+            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
             echo "" 1>&2
             show_usage 1>&2
             exit 1;;
@@ -48,29 +47,23 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-datasetname=$1
-config=$2
+datasetname=$1 && assert_is_dataset $datasetname
+configname=$2
+config=$SLAB_ROOT/tools/features/conf/$configname.toml && assert_not_missing $config
 
-assert_is_dataset $datasetname
 datasetdir=$SLAB_DATASETS/$datasetname
 odir=$SLAB_FEATURES/$datasetname
 mkdir -p $odir
 
-# The features name correspond to the name of configuration file
-# without the extension.
-bname=$(basename $config)
-feaname=${bname%%.*}
-
-out=$odir/$feaname.h5
-scp=$datasetdir/wav.scp
-assert_not_missing $scp
+out=$odir/$configname.h5
+scp=$datasetdir/wav.scp && assert_not_missing $scp
 
 if [ -f $out ]; then
     echo "The features are already extracted ($out)."
     exit 0
 fi
 
-echo extracting features from $scp to $out
+echo "Extracting features from $scp to $out."
 
 tmp=$(mktemp -d -p $odir)
 trap 'rm -fr "$tmp"; trap - EXIT; exit' EXIT INT HUP
@@ -80,14 +73,14 @@ split -n l/$njobs $scp --numeric-suffixes=1
 rename 's/x0+/x/' x*
 cd $cwd
 
-. ./parallel_env.sh
-$parallel_cmd julia --project $SLAB_ROOT/recipes/features/scripts/features.jl \
+. $SLAB_ROOT/tools/features/parallel_env.sh
+$parallel_cmd julia --project $SLAB_ROOT/tools/features/scripts/features.jl \
     -c $compression \
-    conf/mfcc_d_dd_16kHz.toml \
+    $config \
     $tmp/x\$SGE_TASK_ID \
     $tmp/\$SGE_TASK_ID.h5
 
-julia --project $SLAB_ROOT/recipes/features/scripts/concat.jl \
+julia --project $SLAB_ROOT/tools/features/scripts/concat.jl \
     -c $compression \
     $out \
     $tmp/[1-9]*h5
