@@ -1,5 +1,7 @@
 #!/bin/sh -e
 
+# SPDX-License-Identifier: MIT
+
 . $SLAB_ROOT/tools/utils/utils.sh
 
 show_usage() {
@@ -35,7 +37,7 @@ fi
 
 dataset=$1
 if [ -z $dataset ]; then
-    for file in $SLAB_ROOT/recipes/features/conf/*toml; do
+    for file in $SLAB_ROOT/tools/features/conf/*toml; do
         bname=$(basename $file)
         echo ${bname%%.*}
     done

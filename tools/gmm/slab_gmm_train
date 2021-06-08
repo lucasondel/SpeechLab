@@ -1,9 +1,9 @@
 #!/bin/sh -e
 
+# SPDX-License-Identifier: MIT
+
 cmd=$0
-root=$(dirname $(dirname $(dirname $(realpath $cmd))))
-. $root/env.sh
-. $root/utils/utils.sh
+. $SLAB_ROOT/tools/utils/utils.sh
 
 #######################################################################
 # Defaults
@@ -16,7 +16,7 @@ checkpoint_rate=10
 #######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <dataset> <fea-name> <config>"
+    echo "usage: $cmd [options] <dataset> <feaname> <configname>"
 }
 
 show_help() {
@@ -24,7 +24,7 @@ show_help() {
     echo ""
     echo "Train a GMM on <dataset>."
     echo ""
-    echo "  -c C            save a checkpoint every C updates"
+    echo "  -c C            save a checkpoint every C updates (default: $checkpoint_rate)"
     echo "  -d              use double precision for computations"
     echo "                  (default is single precision)"
     echo "  -g              use a GPU for training the model"
@@ -58,10 +58,12 @@ fi
 
 datasetname=$1
 feaname=$2
-config=$3
+configname=$3
+config=$SLAB_ROOT/tools/gmm/conf/$configname.toml && assert_not_missing $config
 
 datasetdir=$SLAB_DATASETS/$datasetname
-features=$SLAB_FEATURES/$datasetname/$feaname.h5
+features=$SLAB_FEATURES/$datasetname/$feaname.h5 && assert_not_missing $features
+uttids=$datasetdir/uttids && assert_not_missing $uttids
 
 # The model name corresponds to the name of the configuration file
 # without the extension.
@@ -71,17 +73,10 @@ modelname=${bname%%.*}
 odir=$SLAB_MODELS/$datasetname/$modelname
 mkdir -p $odir
 
-echo "The model and other intermediate results will be stored in $odir."
-
-uttids=$datasetdir/uttids
-
-assert_not_missing $uttids
-assert_not_missing $features
-
 stats=$odir/stats.h5
 if [ ! -f $stats ]; then
     shuf < $uttids | head -n $nutts_init | \
-        julia --project scripts/feastats.jl $features $stats
+        julia --project $SLAB_ROOT/tools/gmm/scripts/feastats.jl $features $stats
 else
     echo "Statistics are already estimated ($stats)."
 fi
@@ -94,17 +89,17 @@ checkpoint_name=$(find $odir -name "[0-9]*jld2" -exec basename {} \; | \
 if [ ! -z $checkpoint_name ]; then
     num=$(echo $checkpoint_name | cut -d '.' -f1)
     start_update=$((num + 1))
+    checkpoint_opt="--start-from $odir/$checkpoint_name"
 else
     start_update=1
 fi
-checkpoint=$odir/$checkpoint_name
 
 final=$odir/final.jld2
 if [ ! -f $final ]; then
-    cat $uttids | julia --project scripts/gmm.jl \
+    cat $uttids | julia --project $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
         $precision_opt $gpu_opt \
         --checkpoint-rate $checkpoint_rate \
-        --start-from $checkpoint \
+        $checkpoint_opt \
         --start-update $start_update \
         $config \
         $stats \
