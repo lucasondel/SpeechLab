@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-cmd=$(basename $0)
+cmd=$0
 . $SLAB_ROOT/tools/utils/utils.sh
 
 #######################################################################
@@ -14,15 +14,14 @@ njobs=1
 #######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <scp> <config> <out>"
+    echo "usage: $cmd [options] <model> <features> <uttids> <out>"
 }
 
 show_help() {
     show_usage
     echo ""
-    echo "Extract speech features from <scp> into a HDF5 archive."
+    echo "Predict the GMM most likely component on <dataset>."
     echo ""
-    echo "  -c C            compression level from 0 to 9 (default: $compression)"
     echo "  -h              show this help message"
     echo "  -n N            use N parallel jobs (default: $njobs)"
 }
@@ -42,44 +41,32 @@ while :; do
     shift
 done
 
-if [ $# -ne 3 ]; then
+if [ $# -ne 4 ]; then
     show_usage 1>&2
     exit 1
 fi
 
-
-scp=$1 && assert_not_missing $scp
-config=$2 && assert_not_missing $config
-out=$3
+model=$1 && assert_not_missing $model
+features=$2 && assert_not_missing $features
+uttids=$3 && assert_not_missing $uttids
+out=$4
 odir=$(dirname $out)
 mkdir -p $odir
-
-if [ -f $out ]; then
-    echo "The features are already extracted ($out)."
-    exit 0
-fi
-
-echo "Extracting features from $scp to $out."
 
 tmp=$(mktemp -d -p $odir)
 trap 'rm -fr "$tmp"; trap - EXIT; exit' EXIT INT HUP
 cwd=$(pwd)
 cd $tmp
-split -n l/$njobs $scp --numeric-suffixes=1
+split -n l/$njobs $uttids --numeric-suffixes=1
 rename 's/x0+/x/' x*
 cd $cwd
 
-. $SLAB_ROOT/tools/features/parallel_env.sh
-$parallel_cmd julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/features/scripts/features.jl \
-    -c $compression \
-    $config \
-    $tmp/x\$SGE_TASK_ID \
-    $tmp/\$SGE_TASK_ID.h5
+. $SLAB_ROOT/tools/gmm/parallel_env.sh
 
-julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/features/scripts/concat.jl \
-    -c $compression \
-    $out \
-    $tmp/[1-9]*h5
+$parallel_cmd_predict "cat $tmp/x\$SGE_TASK_ID | julia --project=$SLAB_ROOT/Project.toml \
+    $SLAB_ROOT/tools/gmm/scripts/predict.jl \
+        $model \
+        $features > $tmp/out_\$SGE_TASK_ID"
+
+cat $tmp/out_[1-9]* > $out
 

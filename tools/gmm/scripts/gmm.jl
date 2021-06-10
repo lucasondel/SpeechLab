@@ -11,17 +11,14 @@ using TOML
 
 CUDA.allowscalar(false)
 
+include("utils.jl")
+
 const DEFAULTS_MODEL = Dict(
     "ncomponents" => 1,
     "covtype" => "full",
     "priortype" => "categorical",
     "noise_init" => 0.1,
     "pstrength" => 1
-)
-
-const DEFAULTS_INFERENCE = Dict(
-    "steps" => 1000,
-    "learning_rate" => "0.1",
 )
 
 function parse_commandline()
@@ -31,9 +28,17 @@ function parse_commandline()
             default = 100
             arg_type = Int
             help = "save a checkpoint of the model every C updates"
+        "--learning-rate", "-l"
+            default = 0.1
+            arg_type = Float64
+            help = "constant learning rate of the training"
+        "--mini-batch-size", "-m"
+            default = 1
+            arg_type = Int
+            help = "number of utterances per mini-batch"
         "--single-precision", "-S"
             action = :store_true
-            help = "use float32 data type for computation"
+            help = "use float32 data type for computations"
         "--start-from", "-s"
             default = ""
             help = "start training from the given checkpoint model"
@@ -41,6 +46,10 @@ function parse_commandline()
             default = 1
             arg_type = Int
             help = "start training the given update number"
+        "--steps", "-n"
+            default = 1
+            arg_type = Int
+            help = "number of training steps"
         "--use-gpu", "-g"
             action = :store_true
             help = "use a GPU for training the model"
@@ -65,49 +74,6 @@ function parse_commandline()
     parse_args(s)
 end
 
-function makemodel(T, modelconf, μ, Σ)
-    C = modelconf["ncomponents"]
-    pstrength = modelconf["pstrength"]
-    σ = modelconf["noise_init"]
-    D = length(μ)
-    μ₀ = Array{T}(μ)
-    W₀ = Array{T}(Hermitian(inv(Σ)))
-    diagΣ₀ = Array{T}(diag(Σ))
-
-    @debug "creating model with $C components (covtype = $(modelconf["covtype"]))"
-    components = []
-    for c in 1:C
-        if modelconf["covtype"] == "full"
-            push!(components, Normal(T, D; μ₀, W₀, pstrength, σ))
-        elseif modelconf["covtype"] == "diagonal"
-            push!(components, NormalDiag(T, D; μ₀, diagΣ₀, pstrength, σ))
-        else
-            error("unknown cov type $(modelconf["covtype"])")
-        end
-    end
-    Mixture(T, components = Tuple(components))
-end
-
-function load_filelist(uttids, feadir, ext)
-    filelist= []
-    open(uttids, "r") do f
-        for line in eachline(f)
-            push!(filelist, joinpath(feadir, line*ext))
-        end
-    end
-    filelist
-end
-
-function savemodel(dir, model, modelconf, inferenceconf, step = -1)
-    data = Dict(
-        "modelconf" => modelconf,
-        "inferenceconf" => inferenceconf,
-        "model" => model
-    )
-    modelname = step > 0 ? "$step.jld2" : "final.jld2"
-    save(joinpath(dir, modelname), data)
-end
-
 function main(args)
     config = TOML.parsefile(args["config"])
     outdir = args["outdir"]
@@ -126,8 +92,7 @@ function main(args)
         model = makemodel(T, modelconf, μ, Σ)
     else
         dict = load(args["start-from"])
-        model = dict["model"]
-        modelconf = dict["model"]
+        model, modelconf = loadmodel(args["start-from"])
     end
 
     if args["use-gpu"]
@@ -135,11 +100,15 @@ function main(args)
         model |> gpu!
     end
 
-    inferenceconf = merge(DEFAULTS_INFERENCE, config["inference"])
     checkrate = args["checkpoint-rate"]
-    lrate = inferenceconf["learning_rate"]
-    steps = inferenceconf["steps"]
-    mb_size = inferenceconf["mini_batch_size"]
+    lrate = args["learning-rate"]
+    steps = args["steps"]
+    mb_size = args["mini-batch-size"]
+    inferenceconf = Dict(
+        "learning-rate" => lrate,
+        "steps" => steps,
+        "mb_size" => mb_size
+    )
     params = filter(isbayesianparam, getparams(model))
     cache = Dict()
     h5open(args["features"], "r") do ffea

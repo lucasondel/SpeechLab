@@ -6,6 +6,6 @@ covtype = "diagonal" # "full" | "diagonal"
 priortype = "categorical" # "categorical" | "stick-breaking"
 
 [inference]
-steps = 200
+steps = 1000
 learning_rate = 1e-2
 mini_batch_size = 300 # numbers of utterances per mini-batch

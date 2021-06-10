@@ -12,6 +12,9 @@ nutts_init=10000
 use_gpu=no
 double_precision=no
 checkpoint_rate=10
+mbatch=1
+steps=1
+lrate=0.1
 
 #######################################################################
 
@@ -29,6 +32,9 @@ show_help() {
     echo "                  (default is single precision)"
     echo "  -g              use a GPU for training the model"
     echo "  -h              show this help message"
+    echo "  -l              learning rate (default: $lrate)"
+    echo "  -m              number of utterances per mini-batch (default: $mbatch)"
+    echo "  -n              number of steps for the training (default: $steps)"
     echo "  -u U            number of utterances to use to calculate"
     echo "                  the data statistics for initalization"
     echo "                  (default: $nutts_init)"
@@ -40,6 +46,9 @@ while :; do
         -c) checkpoint_rate=$2; shift;;
         -d) double_precision=yes;;
         -g) use_gpu=yes;;
+        -l) lrate=$2; shift;;
+        -m) mbatch=$2; shift;;
+        -n) steps=$2; shift;;
         -u) nutts_init=$2; shift;;
         -*)
             echo "unknown option: $1. Try '$0 -h' for more informations."  1>&2
@@ -76,7 +85,8 @@ mkdir -p $odir
 stats=$odir/stats.h5
 if [ ! -f $stats ]; then
     shuf < $uttids | head -n $nutts_init | \
-        julia --project $SLAB_ROOT/tools/gmm/scripts/feastats.jl $features $stats
+        julia --project=$SLAB_ROOT/Project.toml \
+            $SLAB_ROOT/tools/gmm/scripts/feastats.jl $features $stats
 else
     echo "Statistics are already estimated ($stats)."
 fi
@@ -96,15 +106,19 @@ fi
 
 final=$odir/final.jld2
 if [ ! -f $final ]; then
-    cat $uttids | julia --project $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
-        $precision_opt $gpu_opt \
-        --checkpoint-rate $checkpoint_rate \
-        $checkpoint_opt \
-        --start-update $start_update \
-        $config \
-        $stats \
-        $features \
-        $odir | tee $odir/log
+    cat $uttids | JULIA_DEBUG=JLD2 julia --project=$SLAB_ROOT/Project.toml \
+        $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
+            $precision_opt $gpu_opt \
+            --checkpoint-rate $checkpoint_rate \
+            $checkpoint_opt \
+            --start-update $start_update \
+            --learning-rate $lrate \
+            --mini-batch-size $mbatch \
+            --steps $steps \
+            $config \
+            $stats \
+            $features \
+            $odir | tee -a $odir/log
 else
     echo "The model is already trained ($final)."
 fi
