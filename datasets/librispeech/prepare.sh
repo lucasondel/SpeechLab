@@ -40,7 +40,7 @@ mkdir -p $odir/.local
 
 [ -x "$(command -v flac)" ] || (echo "flac is not installed" && exit 1)
 
-if [ ! -f "$localdir/.done" ]; then
+if [ ! -f "$localdir/corpus/.done" ]; then
     mkdir -p $localdir/corpus
     cd $localdir/corpus
     wget https://www.openslr.org/resources/12/dev-clean.tar.gz
