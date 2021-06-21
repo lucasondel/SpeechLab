@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-cmd=$0
+cmd=$(basename $0)
 . $SLAB_ROOT/tools/utils/utils.sh
 
 #######################################################################
