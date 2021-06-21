@@ -115,13 +115,16 @@ if [ ! -f $sdir/.done ]; then
     mkdir -p $sdir
     rm -f $sdir/wav.scp $sdir/trans.wrd $sdir/utt2spk
 
-    for split in 1h 9h; do
-        for subset in clean other; do
-            for n in $(seq 0 5); do
-                subsetdir=$localdir/corpus/librispeech_finetuning/1h/$n/$subset
-                prepare_subset $sdir $subsetdir
-            done
+    for subset in clean other; do
+        for n in $(seq 0 5); do
+            subsetdir=$localdir/corpus/librispeech_finetuning/1h/$n/$subset
+            prepare_subset $sdir $subsetdir
         done
+    done
+
+    for subset in clean other; do
+        subsetdir=$localdir/corpus/librispeech_finetuning/9h/$subset
+        prepare_subset $sdir $subsetdir
     done
     date > $sdir/.done
 else
