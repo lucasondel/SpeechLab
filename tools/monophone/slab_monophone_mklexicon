@@ -1,0 +1,51 @@
+#!/bin/sh -e
+
+# SPDX-License-Identifier: MIT
+
+cmd=$(basename $0)
+. $SLAB_ROOT/tools/utils/utils.sh
+
+show_usage() {
+    echo "usage: $cmd [options] <in-lexicon> <out-lexiconfsms>"
+}
+
+show_help() {
+    show_usage
+    echo ""
+    echo "Make lexicon fsms (one per word) from a lexicon file."
+    echo ""
+    echo "  -h              show this help message"
+}
+
+while :; do
+    case "$1" in
+        -h) show_help; exit 0;;
+        -*)
+            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
+            echo "" 1>&2
+            show_usage 1>&2
+            exit 1;;
+        *) break;;
+    esac
+    shift
+done
+
+if [ $# -ne 2 ]; then
+    show_usage 1>&2
+    exit 1
+fi
+
+
+inlexicon=$1 && assert_not_missing $inlexicon
+outlexicon=$2
+
+if [ -f $outlexicon ]; then
+    echo "The lexicon fsms are already built in $outlexicon."
+    exit 0
+fi
+
+julia --project=$SLAB_ROOT/Project.toml \
+    $SLAB_ROOT/tools/monophone/scripts/makelexicon.jl \
+    $inlexicon \
+    $outlexicon
+

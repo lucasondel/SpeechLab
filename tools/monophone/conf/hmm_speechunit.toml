@@ -3,7 +3,7 @@
 states = [
     { id = 1, initweight = 1.0, finalweight = 0.0 },
     { id = 2, initweight = 0.0, finalweight = 0.0 },
-    { id = 3, initweight = 0.0, finalweight = 1.0 }
+    { id = 3, initweight = 0.0, finalweight = 0.25 }
 ]
 
 links = [

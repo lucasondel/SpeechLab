@@ -1,11 +1,11 @@
 # SPD-License-Identifier: MIT
-#
+
 using ArgParse
 using JLD2
 using MarkovModels
 using TOML
 
-function makehmm(topo, pdfstartidx)
+function makehmm(unit, topo, pdfstartidx)
     SF = LogSemifield{Float64}
     fsm = FSM{SF}()
 
@@ -15,20 +15,17 @@ function makehmm(topo, pdfstartidx)
         if newidx == pdfstartidx || ! topo["tiestates"]
             newidx += 1
         end
-
-        initweight = SF(log(state["initweight"]))
-        finalweight = SF(log(state["finalweight"]))
-        states[state["id"]] = addstate!(fsm, pdfindex = newidx,
-                                        initweight = initweight,
-                                        finalweight = finalweight,
-                                        label = "$(state["id"])")
+        s = addstate!(fsm, pdfindex = newidx, label = "$(state["id"])")
+        setinit!(s, SF(log(state["initweight"])))
+        setfinal!(s, SF(log(state["finalweight"])))
+        states[state["id"]] = s
     end
 
     for link in topo["links"]
-        weight = SF(log(link["weight"]))
-        link!(fsm, states[link["src"]], states[link["dest"]], weight)
+        link!(fsm, states[link["src"]], states[link["dest"]], SF(log(link["weight"])))
     end
-    fsm, newidx
+
+    fsm |> renormalize! , newidx
 end
 
 function parse_commandline()
@@ -51,37 +48,36 @@ function parse_commandline()
     Build a set of HMM. The topology file should be formatted as:
 
 
+    states = [
 
 
-    \ua0\ua0states = [
+    \ua0\ua0{ id = 1, initweight = 1.0, finalweight = 0.0 },
 
 
-    \ua0\ua0\ua0\ua0{ id = 1, initweight = 1.0, finalweight = 0.0 },
+    \ua0\ua0...
 
 
-    \ua0\ua0\ua0\ua0...
-
-
-    \ua0\ua0]
-
-
-
-
-    \ua0\ua0links = [
-
-
-    \ua0\ua0\ua0\ua0{ src = 1, dest = 2, weight = 0.5 },
-
-
-    \ua0\ua0\ua0\ua0...
-
-
-    \ua0\ua0]
+    ]
 
 
 
 
-    \ua0\ua0tiestates = false | true
+    links = [
+
+
+    \ua0\ua0{ src = 1, dest = 2, weight = 0.5 },
+
+
+    \ua0\ua0...
+
+
+    ]
+
+
+
+
+    tiestates = false | true
+
 
 
     """
@@ -116,13 +112,13 @@ function main(args)
 
     su_hmms = Dict()
     for unit in speech_units
-        hmm, pdfstartidx = makehmm(topo, pdfstartidx)
+        hmm, pdfstartidx = makehmm(unit, topo, pdfstartidx)
         su_hmms[unit] = hmm
     end
 
     nsu_hmms = Dict()
     for unit in non_speech_units
-        hmm, pdfstartidx = makehmm(nsu_topo, pdfstartidx)
+        hmm, pdfstartidx = makehmm(unit, nsu_topo, pdfstartidx)
         nsu_hmms[unit] = hmm
     end
 
@@ -132,3 +128,4 @@ end
 
 args = parse_commandline()
 main(args)
+
