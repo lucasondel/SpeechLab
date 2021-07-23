@@ -106,7 +106,7 @@ fi
 
 final=$odir/final.jld2
 if [ ! -f $final ]; then
-    cat $uttids | JULIA_DEBUG=JLD2 julia --project=$SLAB_ROOT/Project.toml \
+    cat $uttids | julia --project=$SLAB_ROOT/Project.toml \
         $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
             $precision_opt $gpu_opt \
             --checkpoint-rate $checkpoint_rate \
