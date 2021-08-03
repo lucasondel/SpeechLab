@@ -4,4 +4,5 @@
 
 export PATH=$SLAB_ROOT/tools/features:$PATH
 export PATH=$SLAB_ROOT/tools/gmm:$PATH
+export PATH=$SLAB_ROOT/tools/monophone:$PATH
 export PATH=$SLAB_ROOT/tools/utils:$PATH
