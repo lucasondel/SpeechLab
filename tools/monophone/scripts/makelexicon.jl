@@ -28,7 +28,8 @@ function parse_commandline()
 end
 
 function LinearFSM(seq)
-    fsm = FSM()
+    SF = LogSemifield{Float32}
+    fsm = FSM{SF}()
 
     prev = nothing
     for (i, token) in enumerate(seq)

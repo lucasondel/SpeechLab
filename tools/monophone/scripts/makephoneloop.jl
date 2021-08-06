@@ -30,9 +30,10 @@ function main(args)
     hmmsdata = load(args["hmms"])
     su_hmms = hmmsdata["speech_units"]
     nsu_hmms = hmmsdata["non_speech_units"]
+    num_pdfs = hmmsdata["num_pdfs"]
     hmms = merge(su_hmms, nsu_hmms)
 
-    SF = LogSemifield{Float64}
+    SF = LogSemifield{Float32}
     fsm = FSM{SF}()
 
     for unit in collect(keys(hmms))
@@ -56,7 +57,7 @@ function main(args)
         end
     end
     fsm = replace(renormalize!(fsm), hmms)
-    cfsm = compile(fsm)
+    cfsm = compile(fsm, num_pdfs)
 
     jldopen(args["cfsm"], "w") do f f["cfsm"] = cfsm end
 end

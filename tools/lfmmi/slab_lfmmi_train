@@ -1,0 +1,155 @@
+#!/bin/sh -e
+
+# SPDX-License-Identifier: MIT
+
+cmd=$(basename $0)
+. $SLAB_ROOT/tools/utils/utils.sh
+
+#######################################################################
+# Defaults
+
+confdir=$SLAB_ROOT/tools/lfmmi/conf
+use_gpu=no
+double_precision=no
+checkpoint_rate=10
+mbatch=1
+steps=1
+lrate=0.1
+njobs=4
+
+#######################################################################
+
+show_usage() {
+    echo "usage: $cmd [options] <lang-dir> <dataset-dir> <in-model> <out-dir>" #<fea-dir> <configname>"
+}
+
+show_help() {
+    show_usage
+    echo ""
+    echo "Training a neural network using LF-MMI."
+    echo ""
+    echo "  -C CONFDIR      directory where to find the config files (default: $confdir)"
+    echo "  -c CHECKRATE    save a checkpoint every C updates (default: $checkpoint_rate)"
+    echo "  -d              use double precision"
+    echo "  -g              use a GPU to train the model"
+    echo "  -h              show this help message"
+    echo "  -l LRATE        learning rate (default: $lrate)"
+    echo "  -m NUTTS        number of utterances per mini-batch (default: $mbatch)"
+    echo "  -N NSTEPS       number of steps for the training (default: $steps)"
+    echo "  -n NJOBS        number of parallel jobs (default: $njobs)"
+}
+
+while :; do
+    case "$1" in
+        -h) show_help; exit 0;;
+        -C) confdir=$2; shift;;
+        -c) checkpoint_rate=$2; shift;;
+        -d) double_precision=yes;;
+        -g) use_gpu=yes;;
+        -l) lrate=$2; shift;;
+        -m) mbatch=$2; shift;;
+        -N) steps=$2; shift;;
+        -n) njobs=$2; shift;;
+        -u) nutts_init=$2; shift;;
+        -*)
+            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
+            echo "" 1>&2
+            show_usage 1>&2
+            exit 1;;
+        *) break;;
+    esac
+    shift
+done
+
+if [ $# -ne 4 ]; then
+    show_usage 1>&2
+    exit 1
+fi
+
+langdir=$1
+datasetdir=$2
+inmodel=$3
+odir=$4
+
+echo "--> Build the HMM components for each basic units."
+slab_monophone_mkhmms \
+    $confdir/hmm_speechunit.toml \
+    $confdir/hmm_nonspeechunit.toml \
+    $langdir/units \
+    $odir/hmms.jld2
+
+echo "--> Build the pronunciation fsms."
+slab_monophone_mklexicon \
+    $langdir/lexicon \
+    $odir/lexicon.fsms.jld2
+
+echo "--> Compile the numerator fsms."
+slab_monophone_mkalis \
+    -n $njobs \
+    $odir/hmms.jld2 \
+    $odir/lexicon.fsms.jld2 \
+    $datasetdir/trans \
+    $odir/numerator_fsms.jld2
+
+echo "--> Compile the denominator fsm."
+slab_monophone_mkploop \
+    -s -e \
+    $odir/hmms.jld2 \
+    $odir/denominator_fsm.jld2
+
+exit 0
+
+config=$SLAB_ROOT/tools/gmm/conf/$configname.toml && assert_not_missing $config
+
+datasetdir=$SLAB_DATASETS/$datasetname
+features=$SLAB_FEATURES/$datasetname/$feaname.h5 && assert_not_missing $features
+uttids=$datasetdir/uttids && assert_not_missing $uttids
+
+# The model name corresponds to the name of the configuration file
+# without the extension.
+bname=$(basename $config)
+modelname=${bname%%.*}
+
+odir=$SLAB_MODELS/$datasetname/$modelname
+mkdir -p $odir
+
+stats=$odir/stats.h5
+if [ ! -f $stats ]; then
+    shuf < $uttids | head -n $nutts_init | \
+        julia --project=$SLAB_ROOT/Project.toml \
+            $SLAB_ROOT/tools/gmm/scripts/feastats.jl $features $stats
+else
+    echo "Statistics are already estimated ($stats)."
+fi
+
+[ $use_gpu = "yes" ] && gpu_opt="-g"
+[ $double_precision = "no" ] && precision_opt="-S"
+
+checkpoint_name=$(find $odir -name "[0-9]*jld2" -exec basename {} \; | \
+    sort -t '.' -k 1 -g | tail -1)
+if [ ! -z $checkpoint_name ]; then
+    num=$(echo $checkpoint_name | cut -d '.' -f1)
+    start_update=$((num + 1))
+    checkpoint_opt="--start-from $odir/$checkpoint_name"
+else
+    start_update=1
+fi
+
+final=$odir/final.jld2
+if [ ! -f $final ]; then
+    cat $uttids | julia --project=$SLAB_ROOT/Project.toml \
+        $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
+            $precision_opt $gpu_opt \
+            --checkpoint-rate $checkpoint_rate \
+            $checkpoint_opt \
+            --start-update $start_update \
+            --learning-rate $lrate \
+            --mini-batch-size $mbatch \
+            --steps $steps \
+            $config \
+            $stats \
+            $features \
+            $odir | tee -a $odir/log
+else
+    echo "The model is already trained ($final)."
+fi

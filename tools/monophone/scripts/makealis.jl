@@ -31,9 +31,10 @@ function main(args)
     lexicon = load(args["lexiconfsm"])
     su_hmms = hmmsdata["speech_units"]
     nsu_hmms = hmmsdata["non_speech_units"]
+    num_pdfs = hmmsdata["num_pdfs"]
     hmms = merge(su_hmms, nsu_hmms)
 
-    SF = LogSemifield{Float64}
+    SF = LogSemifield{Float32}
 
     jldopen(args["alifsms"], "w") do f
         open(args["ali"], "r") do rf
@@ -59,7 +60,7 @@ function main(args)
                 setfinal!(prev)
 
                 fsm = replace(replace(renormalize!(fsm), lexicon), hmms)
-                f[uttid] = compile(fsm)
+                f[uttid] = compile(fsm |> remove_eps, num_pdfs)
             end
         end
     end

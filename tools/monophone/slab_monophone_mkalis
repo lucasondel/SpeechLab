@@ -48,7 +48,7 @@ trans=$3 && assert_not_missing $trans
 out=$4
 
 if [ -f $out ]; then
-    echo "The alignemnt graphs are already prepared in $out."
+    echo "The alignment graphs are already built in $out."
     exit 0
 fi
 

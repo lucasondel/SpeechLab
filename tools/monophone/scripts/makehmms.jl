@@ -6,7 +6,7 @@ using MarkovModels
 using TOML
 
 function makehmm(unit, topo, pdfstartidx)
-    SF = LogSemifield{Float64}
+    SF = LogSemifield{Float32}
     fsm = FSM{SF}()
 
     states = Dict()
@@ -123,7 +123,8 @@ function main(args)
     end
 
     save(args["hmms"], Dict("speech_units" => su_hmms,
-                            "non_speech_units" => nsu_hmms))
+                            "non_speech_units" => nsu_hmms,
+                            "num_pdfs" => pdfstartidx))
 end
 
 args = parse_commandline()

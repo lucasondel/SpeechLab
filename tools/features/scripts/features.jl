@@ -152,10 +152,12 @@ function main(args)
             uttid, path_or_pipe = load_scpentry(line)
             channels, srate = load(path_or_pipe)
 
+
             @assert srate == conf["srate"]
             @assert size(channels, 2) == 1
 
             fea = channels[:,1] |> feaextractor
+            fea = convert(Array{Float32}, fea)
 
             f[uttid, compress = args["compression-level"]] = fea
         end
