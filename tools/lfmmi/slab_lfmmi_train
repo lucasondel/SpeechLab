@@ -97,59 +97,6 @@ slab_monophone_mkploop \
     $odir/hmms.jld2 \
     $odir/denominator_fsm.jld2
 
-exit 0
 
-config=$SLAB_ROOT/tools/gmm/conf/$configname.toml && assert_not_missing $config
-
-datasetdir=$SLAB_DATASETS/$datasetname
-features=$SLAB_FEATURES/$datasetname/$feaname.h5 && assert_not_missing $features
-uttids=$datasetdir/uttids && assert_not_missing $uttids
-
-# The model name corresponds to the name of the configuration file
-# without the extension.
-bname=$(basename $config)
-modelname=${bname%%.*}
-
-odir=$SLAB_MODELS/$datasetname/$modelname
-mkdir -p $odir
-
-stats=$odir/stats.h5
-if [ ! -f $stats ]; then
-    shuf < $uttids | head -n $nutts_init | \
-        julia --project=$SLAB_ROOT/Project.toml \
-            $SLAB_ROOT/tools/gmm/scripts/feastats.jl $features $stats
-else
-    echo "Statistics are already estimated ($stats)."
-fi
-
-[ $use_gpu = "yes" ] && gpu_opt="-g"
-[ $double_precision = "no" ] && precision_opt="-S"
-
-checkpoint_name=$(find $odir -name "[0-9]*jld2" -exec basename {} \; | \
-    sort -t '.' -k 1 -g | tail -1)
-if [ ! -z $checkpoint_name ]; then
-    num=$(echo $checkpoint_name | cut -d '.' -f1)
-    start_update=$((num + 1))
-    checkpoint_opt="--start-from $odir/$checkpoint_name"
-else
-    start_update=1
-fi
-
-final=$odir/final.jld2
-if [ ! -f $final ]; then
-    cat $uttids | julia --project=$SLAB_ROOT/Project.toml \
-        $SLAB_ROOT/tools/gmm/scripts/gmm.jl \
-            $precision_opt $gpu_opt \
-            --checkpoint-rate $checkpoint_rate \
-            $checkpoint_opt \
-            --start-update $start_update \
-            --learning-rate $lrate \
-            --mini-batch-size $mbatch \
-            --steps $steps \
-            $config \
-            $stats \
-            $features \
-            $odir | tee -a $odir/log
-else
-    echo "The model is already trained ($final)."
-fi
+# Final step is to train the model.
+# julia scripts/train.jl

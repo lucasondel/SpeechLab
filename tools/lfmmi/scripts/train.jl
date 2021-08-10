@@ -5,6 +5,7 @@ using BSON
 using CUDA
 using Flux
 using HDF5
+using JLD2
 using MarkovModels
 using Zygote
 
@@ -16,7 +17,8 @@ function lfmmi_loss(ϕ, numerator_fsms, denominator_fsm)
     γ_num, ttl_num = pdfposteriors(numerator_fsms, ϕ)
     batch_den = union([denominator_fsm for i in 1:size(ϕ, 3)]...)
     γ_den, ttl_den = pdfposteriors(batch_den, ϕ)
-    loss = -sum((ttl_num .- ttl_den))
+    K, N, B = size(ϕ)
+    loss = -sum((ttl_num .- ttl_den)) / (N*B)
     grad = -(γ_num .- γ_den)
     loss, grad
 end
@@ -28,22 +30,27 @@ end
 Zygote.refresh()
 
 function main(args)
-    trainfea = h5data(args["train"])
     numfsms = load(args["numfsms"])
-    bl = BatchLoader(trainfea, alfsms, args["mini-batch-size"])
-    denfsm = load(args["denfsm"])
+    denfsm = load(args["denfsm"])["cfsm"]
     model = BSON.load(args["model"])[:model]
-
+    θ = Flux.params(model)
     opt = ADAM(args["learning-rate"])
-    θ = params(model)
-    for epoch in 1:args["epochs"]
-        for (batch_data, batch_nums) in bl
-            gs = gradients(θ) do
-                L = lfmmi_loss(model(batch_data), batch_nums, denfsm)
-                println("loss = $L")
+
+    trainfea = h5open(args["train"], "r")
+    try
+        bl = BatchLoader(trainfea, numfsms, args["mini-batch-size"])
+        for epoch in 1:args["epochs"]
+            for (batch_data, batch_nums) in bl
+                gs = gradient(θ) do
+                    L = lfmmi_loss(model(batch_data), batch_nums, denfsm)
+                    println("loss = $L")
+                    L
+                end
+                Flux.update!(opt, θ, gs)
             end
-            update!(opt, θ, gs)
         end
+    finally
+        close(trainfea)
     end
 end
 
@@ -52,7 +59,7 @@ function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
         "--learning-rate", "-l"
-            default = 0.1
+            default = 1e-3
             arg_type = Float64
             help = "initial learning rate of the ADAM optimizer"
         "--mini-batch-size", "-m"
