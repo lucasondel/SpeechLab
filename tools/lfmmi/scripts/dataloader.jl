@@ -1,7 +1,5 @@
 # SPD-License-Identifier: MIT
 
-using Random
-
 function padutterance(utt, Nmax)
     D, N = size(utt)
     pad = similar(utt, D, Nmax - N)
