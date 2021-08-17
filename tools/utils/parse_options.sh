@@ -2,20 +2,18 @@
 
 # SPDX-License-Identifier: MIT
 
+# This script is an adapted verision of:
+#   https://github.com/kaldi-asr/kaldi/blob/master/egs/wsj/s5/utils/parse_options.sh
+
 . $SLAB_ROOT/tools/utils/misc.sh
 
 cmdname=$(basename $0)
 
 while :; do
 
-    #if [ -z "$2" ]; then
-    #    echo "empty argument to $1 option" 1>&2
-    #    exit 1
-    #fi
-
     case "$1" in
         --help|-h)
-            show_help()
+            show_help
             exit 0
             ;;
         --*)
