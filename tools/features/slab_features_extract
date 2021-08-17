@@ -6,7 +6,7 @@ cmd=$(basename $0)
 
 
 #######################################################################
-# Arguments
+# Options
 
 compression=0
 njobs=1
@@ -24,7 +24,7 @@ show_help() {
     echo ""
     echo "  --compression   compression level from 0 to 9 (default: $compression)"
     echo "  --help -h       show this help message"
-    echo "  --njobs         use N parallel jobs (default: $njobs)"
+    echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
 . parse_options.sh

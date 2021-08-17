@@ -2,15 +2,17 @@
 
 # SPDX-License-Identifier: MIT
 
-njobs=4
+. $SLAB_ROOT/tools/utils/misc.sh
 
+#######################################################################
+# Options
 
+njobs=1
 
-cmd=$(basename $0)
-. $SLAB_ROOT/tools/utils/utils.sh
+#######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <hmms> <lexicon> <trans> <out-alifsms>"
+    echo "usage: $(basename $0) [options] <hmms> <lexicon> <trans> <out-alifsms>"
 }
 
 show_help() {
@@ -18,29 +20,16 @@ show_help() {
     echo ""
     echo "Build the alignments graphs."
     echo ""
-    echo "  -h              show this help message"
-    echo "  -n N            use N parallel jobs (default: $njobs)"
+    echo "  --help -h       show this help message"
+    echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
-while :; do
-    case "$1" in
-        -h) show_help; exit 0;;
-        -n) njobs=$2; shift;;
-        -*)
-            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
-            echo "" 1>&2
-            show_usage 1>&2
-            exit 1;;
-        *) break;;
-    esac
-    shift
-done
+. $SLAB_ROOT/tools/utils/parse_options.sh
 
 if [ $# -ne 4 ]; then
     show_usage 1>&2
     exit 1
 fi
-
 
 hmms=$1 && assert_not_missing $scp
 lexicon=$2 && assert_not_missing $config

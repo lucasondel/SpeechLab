@@ -1,56 +1,105 @@
 # SPD-License-Identifier: MIT
 
 using ArgParse
-using BSON
 using CUDA
 using Flux
 using HDF5
 using JLD2
+using JSON
 using MarkovModels
+using Random
 using Zygote
 
 CUDA.allowscalar(false)
 
+#======================================================================
+Data loader to load batch of utterances.
+======================================================================#
 include("dataloader.jl")
 
-function lfmmi_loss(ϕ, numerator_fsms, denominator_fsm)
-    γ_num, ttl_num = pdfposteriors(numerator_fsms, ϕ)
-    batch_den = union([denominator_fsm for i in 1:size(ϕ, 3)]...)
-    γ_den, ttl_den = pdfposteriors(batch_den, ϕ)
-    K, N, B = size(ϕ)
-    loss = -sum((ttl_num .- ttl_den)) / (N*B)
-    grad = -(γ_num .- γ_den)
-    loss, grad
+#======================================================================
+Differentiable LF-MMI objective function.
+======================================================================#
+include("lfmmi_loss.jl")
+
+function train!(model, batchloader, denfsm, opt, θ, use_gpu)
+    trainmode!(model)
+
+    acc_loss::Float64 = 0
+    N = 0
+
+    for (i, (batch_data, batch_nums)) in enumerate(batchloader)
+        batch_dens = union([denfsm for i in 1:size(batch_data, 3)]...)
+        if use_gpu
+            batch_data = cu(batch_data)
+            batch_nums = MarkovModels.gpu(batch_nums)
+        end
+
+        L, _ = lfmmi_loss(model(batch_data), batch_nums, batch_dens)
+        acc_loss += L
+        N += 1
+    end
+
+    acc_loss / N
 end
 
-Zygote.@adjoint function lfmmi_loss(ϕ, numerator_fsms, denominator_fsm)
-    loss, grad = lfmmi_loss(ϕ, numerator_fsms, denominator_fsm)
-    loss, Δ -> (Δ .* grad, nothing, nothing)
+function test!(model, batchloader, denfsm, opt, θ, use_gpu)
+    testmode!(model)
+
+    acc_loss::Float64 = 0
+    N = 0
+
+    for (i, (batch_data, batch_nums)) in enumerate(batchloader)
+        batch_dens = union([denfsm for i in 1:size(batch_data, 3)]...)
+        if use_gpu
+            batch_data = cu(batch_data)
+            batch_nums = MarkovModels.gpu(batch_nums)
+        end
+
+        L, gs = withgradient(θ) do
+            lfmmi_loss(model(batch_data), batch_nums, batch_dens)
+        end
+        acc_loss += L
+        N += 1
+
+    end
+
+    acc_loss / N
 end
-Zygote.refresh()
 
 function main(args)
-    numfsms = load(args["numfsms"])
+    train_numfsms = load(args["train_numfsms"])
+    dev_numfsms = load(args["dev_numfsms"])
     denfsm = load(args["denfsm"])["cfsm"]
-    model = BSON.load(args["model"])[:model]
+    model = load(args["model"])["model"]
+    use_gpu = args["use-gpu"]
+    mbsize = args["mini-batch-size"]
+
+    if args["use-gpu"]
+        model = fmap(cu, model)
+        denfsm |> MarkovModels.gpu
+    end
+
     θ = Flux.params(model)
     opt = ADAM(args["learning-rate"])
 
-    trainfea = h5open(args["train"], "r")
-    try
-        bl = BatchLoader(trainfea, numfsms, args["mini-batch-size"])
+    h5open(args["train"], "r") do trainfea
         for epoch in 1:args["epochs"]
-            for (batch_data, batch_nums) in bl
-                gs = gradient(θ) do
-                    L = lfmmi_loss(model(batch_data), batch_nums, denfsm)
-                    println("loss = $L")
-                    L
-                end
-                Flux.update!(opt, θ, gs)
+            trainloss::Float64 = 0
+            devloss::Float64 = 0
+            h5open(args["train"], "r") do trainfea
+                trainbl = BatchLoader(trainfea, train_numfsms, mbsize)
+                train_oss = train!(model, trainbl, denfsm, opt, θ, use_gpu)
             end
+            h5open(args["dev"], "r") do devfea
+                devbl = BatchLoader(devfea, dev_numfsms, mbsize)
+                dev_oss = test!(model, devbl, denfsm, opt, θ, use_gpu)
+            end
+
+            println("epoch $epoch/$(args["epochs"]) " *
+                    "training loss = $(round(train_loss, digits = 4)) " *
+                    "dev loss = $(round(dev_loss, digits = 4))")
         end
-    finally
-        close(trainfea)
     end
 end
 
@@ -75,10 +124,16 @@ function parse_commandline()
             help = "use a GPU for training the model"
         "train"
             required = true
-            help = "training features"
-        "numfsms"
+            help = "training set"
+        "dev"
             required = true
-            help = "numerator fsms (i.e. alignment graphs)"
+            help = "development set"
+        "train_numfsms"
+            required = true
+            help = "numerator fsms (i.e. alignment graphs) for the training set"
+        "dev_numfsms"
+            required = true
+            help = "numerator fsms (i.e. alignment graphs) for the dev set"
         "denfsm"
             required = true
             help = "denominator graph"

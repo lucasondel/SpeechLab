@@ -2,14 +2,18 @@
 
 # SPDX-License-Identifier: MIT
 
-cmd=$(basename $0)
-. $SLAB_ROOT/tools/utils/utils.sh
+. $SLAB_ROOT/tools/utils/misc.sh
 
-start_sil=no
-end_sil=no
+#######################################################################
+# Options
+
+start_sil=false
+end_sil=false
+
+#######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <hmms> <ploop>"
+    echo "usage: $(basename 0) [options] <hmms> <ploop>"
 }
 
 show_help() {
@@ -17,25 +21,12 @@ show_help() {
     echo ""
     echo "Make phone-loop decoding graph."
     echo ""
-    echo "  -e              phone-loop ends with non-speech unit"
-    echo "  -h              show this help message"
-    echo "  -s              phone-loop starts with non-speech unit"
+    echo "  --end-sil       phone-loop ends with a non-speech unit (default: $end_sil)"
+    echo "  --help -h       show this help message"
+    echo "  --start-sil     phone-loop starts with a non-speech unit (default: $start_sil)"
 }
 
-while :; do
-    case "$1" in
-        -e) end_sil=yes; shift;;
-        -h) show_help; exit 0;;
-        -s) start_sil=yes; shift;;
-        -*)
-            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
-            echo "" 1>&2
-            show_usage 1>&2
-            exit 1;;
-        *) break;;
-    esac
-    shift
-done
+. $SLAB_ROOT/tools/utils/parse_options.sh
 
 if [ $# -ne 2 ]; then
     show_usage 1>&2

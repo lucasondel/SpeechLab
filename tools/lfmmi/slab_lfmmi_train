@@ -2,25 +2,19 @@
 
 # SPDX-License-Identifier: MIT
 
-cmd=$(basename $0)
-. $SLAB_ROOT/tools/utils/utils.sh
+. $SLAB_ROOT/tools/utils/misc.sh
 
 #######################################################################
-# Defaults
+# Options
 
 confdir=$SLAB_ROOT/tools/lfmmi/conf
-use_gpu=no
-double_precision=no
-checkpoint_rate=10
-mbatch=1
-steps=1
-lrate=0.1
+use_gpu=false
 njobs=4
 
 #######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <lang-dir> <dataset-dir> <in-model> <out-dir>" #<fea-dir> <configname>"
+    echo "usage: $(basename $0) [options] <lang-dir> <train-dataset-dir> <dev-dataset-dir> <model> <out-dir>" #<fea-dir> <configname>"
 }
 
 show_help() {
@@ -28,48 +22,24 @@ show_help() {
     echo ""
     echo "Training a neural network using LF-MMI."
     echo ""
-    echo "  -C CONFDIR      directory where to find the config files (default: $confdir)"
-    echo "  -c CHECKRATE    save a checkpoint every C updates (default: $checkpoint_rate)"
-    echo "  -d              use double precision"
-    echo "  -g              use a GPU to train the model"
-    echo "  -h              show this help message"
-    echo "  -l LRATE        learning rate (default: $lrate)"
-    echo "  -m NUTTS        number of utterances per mini-batch (default: $mbatch)"
-    echo "  -N NSTEPS       number of steps for the training (default: $steps)"
-    echo "  -n NJOBS        number of parallel jobs (default: $njobs)"
+    echo "  --confdir       directory where to find the config files (default: $confdir)"
+    echo "  --use-gpu        use a GPU to train the model (default: $use_gpu)"
+    echo "  --help -h       show this help message"
+    echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
-while :; do
-    case "$1" in
-        -h) show_help; exit 0;;
-        -C) confdir=$2; shift;;
-        -c) checkpoint_rate=$2; shift;;
-        -d) double_precision=yes;;
-        -g) use_gpu=yes;;
-        -l) lrate=$2; shift;;
-        -m) mbatch=$2; shift;;
-        -N) steps=$2; shift;;
-        -n) njobs=$2; shift;;
-        -u) nutts_init=$2; shift;;
-        -*)
-            echo "Unknown option: $1. Try '$0 -h' for more informations."  1>&2
-            echo "" 1>&2
-            show_usage 1>&2
-            exit 1;;
-        *) break;;
-    esac
-    shift
-done
+. $SLAB_ROOT/tools/utils/parse_options.sh
 
-if [ $# -ne 4 ]; then
+if [ $# -ne 5 ]; then
     show_usage 1>&2
     exit 1
 fi
 
 langdir=$1
-datasetdir=$2
-inmodel=$3
-odir=$4
+traindir=$2
+devdir=$3
+inmodel=$4
+odir=$5
 
 echo "--> Build the HMM components for each basic units."
 slab_monophone_mkhmms \
@@ -83,17 +53,26 @@ slab_monophone_mklexicon \
     $langdir/lexicon \
     $odir/lexicon.fsms.jld2
 
-echo "--> Compile the numerator fsms."
+echo "--> Compile the numerator fsms (train set)."
 slab_monophone_mkalis \
-    -n $njobs \
+    --njobs $njobs \
     $odir/hmms.jld2 \
     $odir/lexicon.fsms.jld2 \
-    $datasetdir/trans \
-    $odir/numerator_fsms.jld2
+    $traindir/trans \
+    $odir/train_numerator_fsms.jld2
+
+echo "--> Compile the numerator fsms (dev set)."
+slab_monophone_mkalis \
+    --njobs $njobs \
+    $odir/hmms.jld2 \
+    $odir/lexicon.fsms.jld2 \
+    $devdir/trans \
+    $odir/dev_numerator_fsms.jld2
 
 echo "--> Compile the denominator fsm."
 slab_monophone_mkploop \
-    -s -e \
+    --start-sil true  \
+    --end-sil true \
     $odir/hmms.jld2 \
     $odir/denominator_fsm.jld2
 

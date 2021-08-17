@@ -37,6 +37,7 @@ while :; do
 
             shift 2
             ;;
+        -*) error "Short option are not supported: $1 $2";;
         *) break;;
     esac
 done
