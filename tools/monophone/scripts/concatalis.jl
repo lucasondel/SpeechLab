@@ -25,8 +25,9 @@ function main(args)
         # Copy the data of each archive in the new one.
         for arch in archives
             jldopen(arch, "r") do farchive
-                for k in keys(farchive)
-                    f[k] = farchive[k]
+                for uttid in keys(farchive)
+                    f["$uttid/cfsm"] = farchive["$uttid"]["cfsm"]
+                    f["$uttid/labels"] = farchive["$uttid"]["labels"]
                 end
             end
         end

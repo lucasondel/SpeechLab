@@ -5,9 +5,9 @@ using CUDA
 using Flux
 using HDF5
 using JLD2
-using JSON
 using MarkovModels
 using Random
+using TOML
 using Zygote
 
 CUDA.allowscalar(false)
@@ -35,7 +35,11 @@ function train!(model, batchloader, denfsm, opt, θ, use_gpu)
             batch_nums = MarkovModels.gpu(batch_nums)
         end
 
-        L, _ = lfmmi_loss(model(batch_data), batch_nums, batch_dens)
+        L, gs = withgradient(θ) do
+            lfmmi_loss(model(batch_data), batch_nums, batch_dens)
+        end
+        Flux.update!(opt, θ, gs)
+
         acc_loss += L
         N += 1
     end
@@ -56,9 +60,8 @@ function test!(model, batchloader, denfsm, opt, θ, use_gpu)
             batch_nums = MarkovModels.gpu(batch_nums)
         end
 
-        L, gs = withgradient(θ) do
-            lfmmi_loss(model(batch_data), batch_nums, batch_dens)
-        end
+        L, _ = lfmmi_loss(model(batch_data), batch_nums, batch_dens)
+
         acc_loss += L
         N += 1
 
@@ -68,38 +71,41 @@ function test!(model, batchloader, denfsm, opt, θ, use_gpu)
 end
 
 function main(args)
+    conf = TOML.parsefile(args["config"])
+    lrate = conf["learning_rate"]
+    epochs = conf["epochs"]
+    mbsize = conf["mini_batch_size"]
+
     train_numfsms = load(args["train_numfsms"])
     dev_numfsms = load(args["dev_numfsms"])
     denfsm = load(args["denfsm"])["cfsm"]
     model = load(args["model"])["model"]
     use_gpu = args["use-gpu"]
-    mbsize = args["mini-batch-size"]
-
-    if args["use-gpu"]
+if args["use-gpu"]
         model = fmap(cu, model)
-        denfsm |> MarkovModels.gpu
+        denfsm = denfsm |> MarkovModels.gpu
     end
 
     θ = Flux.params(model)
-    opt = ADAM(args["learning-rate"])
+    opt = ADAM(lrate)
 
-    h5open(args["train"], "r") do trainfea
-        for epoch in 1:args["epochs"]
-            trainloss::Float64 = 0
-            devloss::Float64 = 0
-            h5open(args["train"], "r") do trainfea
-                trainbl = BatchLoader(trainfea, train_numfsms, mbsize)
-                train_oss = train!(model, trainbl, denfsm, opt, θ, use_gpu)
-            end
-            h5open(args["dev"], "r") do devfea
-                devbl = BatchLoader(devfea, dev_numfsms, mbsize)
-                dev_oss = test!(model, devbl, denfsm, opt, θ, use_gpu)
-            end
+    for epoch in 1:epochs
+        train_loss::Float64 = 0
+        dev_loss::Float64 = 0
 
-            println("epoch $epoch/$(args["epochs"]) " *
-                    "training loss = $(round(train_loss, digits = 4)) " *
-                    "dev loss = $(round(dev_loss, digits = 4))")
+        h5open(args["train"], "r") do trainfea
+            trainbl = BatchLoader(trainfea, train_numfsms, mbsize)
+            train_loss = train!(model, trainbl, denfsm, opt, θ, use_gpu)
         end
+
+        h5open(args["dev"], "r") do devfea
+            devbl = BatchLoader(devfea, dev_numfsms, mbsize)
+            dev_loss = test!(model, devbl, denfsm, opt, θ, use_gpu)
+        end
+
+        println("epoch=$epoch/$epochs " *
+                "train_loss=$(round(train_loss, digits = 4)) " *
+                "dev_loss=$(round(dev_loss, digits = 4))")
     end
 end
 
@@ -107,21 +113,12 @@ end
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
-        "--learning-rate", "-l"
-            default = 1e-3
-            arg_type = Float64
-            help = "initial learning rate of the ADAM optimizer"
-        "--mini-batch-size", "-m"
-            default = 1
-            arg_type = Int
-            help = "number of utterances per mini-batch"
-        "--epochs", "-e"
-            default = 1
-            arg_type = Int
-            help = "number of training epochs"
         "--use-gpu", "-g"
             action = :store_true
-            help = "use a GPU for training the model"
+            help = "train the model on gpu"
+        "config"
+            required = true
+            help = "TOML configuration file for the training"
         "train"
             required = true
             help = "training set"

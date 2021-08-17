@@ -57,9 +57,12 @@ function main(args)
         end
     end
     fsm = replace(renormalize!(fsm), hmms)
-    cfsm = compile(fsm, num_pdfs)
+    cfsm, labels = compile(fsm, num_pdfs)
 
-    jldopen(args["cfsm"], "w") do f f["cfsm"] = cfsm end
+    jldopen(args["cfsm"], "w") do f
+        f["cfsm"] = cfsm
+        f["labels"] = labels
+    end
 end
 
 args = parse_commandline()

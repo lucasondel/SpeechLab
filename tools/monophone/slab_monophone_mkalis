@@ -8,6 +8,7 @@
 # Options
 
 njobs=1
+logdir=$PWD
 
 #######################################################################
 
@@ -21,6 +22,7 @@ show_help() {
     echo "Build the alignments graphs."
     echo ""
     echo "  --help -h       show this help message"
+    echo "  --logdir        logging directory for the parallel environment (default: $logdir)"
     echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 

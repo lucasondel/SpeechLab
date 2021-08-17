@@ -28,7 +28,7 @@ function Base.iterate(bl::BatchLoader, state)
     endidx = min(startidx + bl.batchsize - 1, length(bl.h5data))
 
     utts = [read(bl.h5data[key]) for key in uttids[startidx:endidx]]
-    batch_alis = union([bl.alifsms[key] for key in uttids[startidx:endidx]]...)
+    batch_alis = union([bl.alifsms["$key/cfsm"] for key in uttids[startidx:endidx]]...)
 
     Nmax = maximum(size.(utts, 2))
     batch_data = cat(padutterance.(utts, Nmax)..., dims = 3)

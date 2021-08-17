@@ -60,7 +60,9 @@ function main(args)
                 setfinal!(prev)
 
                 fsm = replace(replace(renormalize!(fsm), lexicon), hmms)
-                f[uttid] = compile(fsm |> remove_eps, num_pdfs)
+                cfsm, labels = compile(fsm |> remove_eps, num_pdfs)
+                f["$uttid/cfsm"] = cfsm
+                f["$uttid/labels"] = labels
             end
         end
     end
