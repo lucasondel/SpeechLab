@@ -10,11 +10,12 @@ cmd=$(basename $0)
 
 compression=0
 njobs=1
+logdir=$PWD
 
 #######################################################################
 
 show_usage() {
-    echo "usage: $cmd [options] <scp> <config> <out>"
+    echo "usage: $cmd [--compression 0-9] [--njobs N] <config> <scp> <out>"
 }
 
 show_help() {
@@ -23,7 +24,8 @@ show_help() {
     echo "Extract speech features from <scp> into a HDF5 archive."
     echo ""
     echo "  --compression   compression level from 0 to 9 (default: $compression)"
-    echo "  --help -h       show this help message"
+    echo "  -h, --help      show this help message"
+    echo "  --logdir        logging directory for the parallel environment (default: $logdir)"
     echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
@@ -34,8 +36,8 @@ if [ $# -ne 3 ]; then
     exit 1
 fi
 
-scp=$1 && assert_not_missing $scp
-config=$2 && assert_not_missing $config
+config=$1 && assert_not_missing $config
+scp=$2 && assert_not_missing $scp
 out=$3
 odir=$(dirname $out)
 mkdir -p $odir

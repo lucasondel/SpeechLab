@@ -5,47 +5,41 @@
 . $SLAB_ROOT/tools/utils/misc.sh
 
 #######################################################################
-# Options
+# Settings
 
-topo_speech_unit=$SLAB_ROOT/tools/lfmmi/conf/hmm_speechunit.toml
-topo_nonspeech_unit=$SLAB_ROOT/tools/lfmmi/conf/hmm_nonspeechunit.toml
-use_gpu=false
-njobs=4
-nworkers=4
+## Input dataset ##
+dataset=mini_librispeech
+datasetdir=~/Datasets/$dataset
+trainset=$datasetdir/train
+devset=$datasetdir/dev
+testset=$datasetdir/test
+
+## Experiment output ##
+expdir=exp
+logdir=exp/logs
+
+## Features configuration ##
+feadir=~/Features/$dataset
+featype=mfcc_d_dd_16kHz
+feaconfig=$SLAB_ROOT/tools/features/conf/${featype}.toml
 
 #######################################################################
 
-show_usage() {
-    echo "usage: $(basename $0) [options] <config> <lang-dir> <train-dir> <dev-dir> <init-model> <train-fea> <dev-fea> <out-dir>"
-}
+mkdir -p $expdir $logdir
 
-show_help() {
-    show_usage
-    echo ""
-    echo "Training a neural network using LF-MMI."
-    echo ""
-    echo "  --topo-speech-unit     HMM topology file for the speech units (default: $topo_speech_unit)"
-    echo "  --topo-nonspeech-unit  HMM topology file for the non-speech units (default: $topo_nonspeech_unit)"
-    echo "  --use-gpu              use a GPU to train the model (default: $use_gpu)"
-    echo "  --help -h              show this help message"
-    echo "  --njobs                number of parallel jobs to comile the FSMs (default: $njobs)"
-    echo "  --nworkers             number of parallel workers for data loading (default: $nworkers)"
-}
-
-. $SLAB_ROOT/tools/utils/parse_options.sh
-if [ $# -ne 8 ]; then
-    show_usage 1>&2
-    exit 1
-fi
-
-config=$1
-langdir=$2
-traindir=$3
-devdir=$4
-initmodel=$5
-trainfea=$6
-devfea=$7
-odir=$8
+echo "================================================================"
+echo "Extracting features"
+echo "================================================================"
+for subset in $trainset $devset $testset; do
+    mkdir -p $logdir/fea-extract
+    slab_features_extract \
+        --logdir $logdir/fea-extract \
+        --njobs 10 \
+        $feaconfig \
+        $subset/wav.scp \
+        $feadir/$(basename $subset)/${featype}.h5
+done
+exit 0
 
 echo "--> Build the HMM components for each basic units."
 slab_monophone_mkhmms \

@@ -21,13 +21,12 @@ show_help() {
     echo ""
     echo "Build the alignments graphs."
     echo ""
-    echo "  --help -h       show this help message"
+    echo "  -h, --help      show this help message"
     echo "  --logdir        logging directory for the parallel environment (default: $logdir)"
     echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
 . $SLAB_ROOT/tools/utils/parse_options.sh
-
 if [ $# -ne 4 ]; then
     show_usage 1>&2
     exit 1
