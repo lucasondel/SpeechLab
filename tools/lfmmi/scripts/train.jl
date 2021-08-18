@@ -81,7 +81,8 @@ function main(args)
     denfsm = load(args["denfsm"])["cfsm"]
     model = load(args["model"])["model"]
     use_gpu = args["use-gpu"]
-if args["use-gpu"]
+
+    if args["use-gpu"]
         model = fmap(cu, model)
         denfsm = denfsm |> MarkovModels.gpu
     end
@@ -90,8 +91,8 @@ if args["use-gpu"]
     opt = ADAM(lrate)
 
     for epoch in 1:epochs
-        train_loss::Float64 = 0
-        dev_loss::Float64 = 0
+        train_loss = 0
+        dev_loss = 0
 
         h5open(args["train"], "r") do trainfea
             trainbl = BatchLoader(trainfea, train_numfsms, mbsize)

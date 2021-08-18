@@ -14,3 +14,10 @@ assert_not_missing() {
     fi
 }
 
+assert_is_installed() {
+    tool=$1
+    if [ ! -x "$(command -v $tool)" ]; then
+        error "$tool is not installed."
+    fi
+}
+

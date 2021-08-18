@@ -1,0 +1,1 @@
+../librispeech/getdata.sh

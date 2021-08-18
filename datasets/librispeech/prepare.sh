@@ -1,5 +1,8 @@
 #!/bin/sh -e
+
 # SPDX-License-Identifier: MIT
+
+LIBRISPEECH_URL=https://www.openslr.org/resources/
 
 show_usage() {
     echo "usage: $(basename $0) [options] <dst-dir>"
@@ -11,7 +14,7 @@ show_help() {
     echo "Prepare the LibriSpeech ASR corpus. See: http://www.openslr.org/12"
     echo "for details"
     echo ""
-    echo "  -h              show this help message"
+    echo "  -h, --help      show this help message"
 }
 
 while :; do
