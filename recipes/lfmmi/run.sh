@@ -20,8 +20,8 @@ logdir=exp/logs
 
 ## Features configuration ##
 feadir=~/Features/$dataset
-featype=mfcc_d_dd_16kHz
-feaconfig=$SLAB_ROOT/tools/features/conf/${featype}.toml
+featype=mfcc_hires_16kHz
+feaconfig=conf/${featype}.toml
 
 #######################################################################
 
