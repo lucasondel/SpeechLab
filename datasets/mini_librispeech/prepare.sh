@@ -6,6 +6,7 @@
 scriptdir=$SLAB_ROOT/datasets/mini_librispeech
 
 MINI_LIBRISPEECH_URL=https://www.openslr.org/resources/31
+MINI_LIBRISPEECH_LM_URL=https://www.openslr.org/resources/11
 
 show_usage() {
     echo "usage: $(basename $0) <out-dir>"
@@ -44,6 +45,10 @@ $scriptdir/prepare_part.sh $localdir/LibriSpeech/train-clean-5 $odir/train
 # Use the development set as test set.
 cdir=$PWD
 cd $odir
+rm -f test
 ln -s ./dev "test"
 cd $cdir
+
+# Download the Language Models.
+$scriptdir/getlm.sh $MINI_LIBRISPEECH_LM_URL $odir/.local/lms
 
