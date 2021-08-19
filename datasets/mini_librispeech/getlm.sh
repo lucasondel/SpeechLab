@@ -1,0 +1,1 @@
+../librispeech/getlm.sh
