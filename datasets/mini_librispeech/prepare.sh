@@ -30,7 +30,7 @@ fi
 odir=$1
 curdir=$(pwd)
 localdir=$odir/.local
-mkdir -p $odir/.local
+mkdir -p $localdir
 
 assert_is_installed flac
 
@@ -50,5 +50,18 @@ ln -s ./dev "test"
 cd $cdir
 
 # Download the Language Models.
-$scriptdir/getlm.sh $MINI_LIBRISPEECH_LM_URL $odir/.local/lms
+$scriptdir/getlm.sh $MINI_LIBRISPEECH_LM_URL $localdir/lms
+
+# Prepare the 'lang' directory.
+langdir=$odir/lang
+mkdir -p $langdir
+
+python $scriptdir/filter_lexicon.py $localdir/lms/librispeech-lexicon.txt \
+    > $langdir/lexicon
+
+echo "SIL\tnonspeech-unit" > $langdir/units
+echo "SPN\tnonspeech-unit" >> $langdir/units
+while read line; do
+    echo "$line\tspeech-unit"
+done <$scriptdir/cmudict_phones >> $langdir/units
 
