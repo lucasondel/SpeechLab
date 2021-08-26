@@ -68,7 +68,7 @@ slab_monophone_mkalis \
     --njobs $njobs \
     $odir/hmms.jld2 \
     $odir/lexicon.fsms.jld2 \
-    $traindir/trans \
+    $traindir/trans.wrd \
     $odir/train_numerator_fsms.jld2
 
 echo "--> Compile the numerator fsms (dev set)."
@@ -79,7 +79,7 @@ slab_monophone_mkalis \
     --njobs $njobs \
     $odir/hmms.jld2 \
     $odir/lexicon.fsms.jld2 \
-    $devdir/trans \
+    $devdir/trans.wrd \
     $odir/dev_numerator_fsms.jld2
 
 echo "--> Compile the denominator fsm."

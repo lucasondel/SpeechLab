@@ -39,59 +39,23 @@ for subset in $trainset $devset $testset; do
         $subset/wav.scp \
         $feadir/$(basename $subset)/${featype}.h5
 done
-exit 0
 
-echo "--> Build the HMM components for each basic units."
-slab_monophone_mkhmms \
-    $topo_speech_unit \
-    $topo_nonspeech_unit \
-    $langdir/units \
-    $odir/hmms.jld2
+echo "================================================================"
+echo "Training"
+echo "================================================================"
+mkdir -p $expdir/train
+slab_lfmmi_train \
+    --topo-nonspeech-unit conf/topo_unit.toml \
+    --topo-speech-unit conf/topo_unit.toml \
+    --use-gpu true \
+    --njobs 10 \
+    --nworkers 4 \
+    conf/train_config.toml \
+    $datasetdir/lang \
+    $datasetdir/train \
+    $datasetdir/dev \
+    models/tdnn.jld2 \
+    $feadir/train/$featype.h5 \
+    $feadir/dev/$featype.h5 \
+    $expdir/train | tee $expdir/train/log
 
-echo "--> Build the pronunciation fsms."
-slab_monophone_mklexicon \
-    $langdir/lexicon \
-    $odir/lexicon.fsms.jld2
-
-echo "--> Compile the numerator fsms (train set)."
-logdir=$odir/logs/align_train
-rm -fr $logdir && mkdir -p $odir/logs/align_train
-slab_monophone_mkalis \
-    --logdir $logdir \
-    --njobs $njobs \
-    $odir/hmms.jld2 \
-    $odir/lexicon.fsms.jld2 \
-    $traindir/trans \
-    $odir/train_numerator_fsms.jld2
-
-echo "--> Compile the numerator fsms (dev set)."
-logdir=$odir/logs/align_dev
-rm -fr $logdir && mkdir -p $odir/logs/align_train
-slab_monophone_mkalis \
-    --logdir $logdir \
-    --njobs $njobs \
-    $odir/hmms.jld2 \
-    $odir/lexicon.fsms.jld2 \
-    $devdir/trans \
-    $odir/dev_numerator_fsms.jld2
-
-echo "--> Compile the denominator fsm."
-slab_monophone_mkploop \
-    --start-sil true  \
-    --end-sil true \
-    $odir/hmms.jld2 \
-    $odir/denominator_fsm.jld2
-
-
-echo "--> Train $initmodel."
-$use_gpu && gpu_opt="--use-gpu"
-julia -t $((nworkers+1)) --project=@. $SLAB_ROOT/tools/lfmmi/scripts/train.jl \
-    $gpu_opt \
-    $config \
-    $trainfea \
-    $devfea \
-    $odir/train_numerator_fsms.jld2 \
-    $odir/dev_numerator_fsms.jld2 \
-    $odir/denominator_fsm.jld2 \
-    $initmodel \
-    $odir

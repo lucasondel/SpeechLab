@@ -56,8 +56,11 @@ $scriptdir/getlm.sh $MINI_LIBRISPEECH_LM_URL $localdir/lms
 langdir=$odir/lang
 mkdir -p $langdir
 
+echo '<SIL>\tSIL' > $langdir/lexicon
+echo '<SPOKEN_NOISE>\tSPN' >> $langdir/lexicon
+echo '<UNK>\tSPN' >> $langdir/lexicon
 python $scriptdir/filter_lexicon.py $localdir/lms/librispeech-lexicon.txt \
-    > $langdir/lexicon
+    | sort | uniq >> $langdir/lexicon
 
 echo "SIL\tnonspeech-unit" > $langdir/units
 echo "SPN\tnonspeech-unit" >> $langdir/units

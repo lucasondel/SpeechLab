@@ -41,28 +41,32 @@ function main(args)
 
             for line in eachline(rf)
                 tokens = split(line)
-                uttid = tokens[1]
+                uttid, sentence = tokens[1], tokens[2:end]
 
-                fsm = FSM{SF}()
-
+                fsm = VectorFSM{SF}()
                 prev = nothing
-                for (i, token) in enumerate(tokens[2:end])
-                    @assert token in keys(hmms) "unkown unit $token"
+                for (i, word) in enumerate(sentence)
+                    if word ∉ keys(lexicon)
+                        @info "no pronunciation found for $word"
+                        word = "<UNK>"
+                    end
 
-                    s = addstate!(fsm, label = token)
+                    initweight = i == 1 ? one(SF) : zero(SF)
+                    finalweight = i == length(sentence) ? one(SF) : zero(SF)
+                    s = addstate!(fsm, word; initweight, finalweight)
                     if i > 1
-                        link!(fsm, prev, s)
-                    else
-                        setinit!(s)
+                        addarc!(fsm, prev, s)
                     end
                     prev = s
                 end
-                setfinal!(prev)
 
-                fsm = replace(replace(renormalize!(fsm), lexicon), hmms)
-                cfsm, labels = compile(fsm |> remove_eps, num_pdfs)
-                f["$uttid/cfsm"] = cfsm
-                f["$uttid/labels"] = labels
+                # G: Grammar L: Lexicon H: HMM
+                GL = HierarchicalFSM(fsm |> renormalize, lexicon)
+                GLH = HierarchicalFSM(GL, hmms)
+                println("MatrixFSM()")
+                #cfsm = MatrixFSM()
+                #f["$uttid/cfsm"] = cfsm
+                #f["$uttid/labels"] = labels
             end
         end
     end

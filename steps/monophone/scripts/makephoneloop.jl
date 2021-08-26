@@ -34,10 +34,10 @@ function main(args)
     hmms = merge(su_hmms, nsu_hmms)
 
     SF = LogSemifield{Float32}
-    fsm = FSM{SF}()
+    fsm = VectorFSM{SF}()
 
     for unit in collect(keys(hmms))
-        s = addstate!(fsm, label = unit)
+        s = addstate!(fsm, unit)
         if ! args["start-non-speech"]
             setinit!(s)
         elseif unit ∈ keys(nsu_hmms)

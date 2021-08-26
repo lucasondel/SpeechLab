@@ -29,19 +29,15 @@ end
 
 function LinearFSM(seq)
     SF = LogSemifield{Float32}
-    fsm = FSM{SF}()
+    fsm = VectorFSM{SF}()
 
     prev = nothing
-    for (i, token) in enumerate(seq)
-        s = addstate!(fsm, label = token)
-        if i > 1
-            link!(fsm, prev, s)
-        else
-            setinit!(s)
-        end
+    for (i, label) in enumerate(seq)
+        initweight = i == 1 ? one(SF) : zero(SF)
+        finalweight = i == length(seq) ? one(SF) : zero(SF)
+        s = addstate!(fsm, label; initweight, finalweight)
         prev = s
     end
-    setfinal!(prev)
 
     fsm
 end
@@ -63,7 +59,7 @@ function main(args)
         for word in keys(pronuns)
             fsms = [LinearFSM(pronun) for pronun in pronuns[word]]
             fsm = union(fsms...)
-            f[word] = fsm |> minimize |> renormalize!
+            f[word] = fsm |> minimize |> renormalize
 
         end
     end
