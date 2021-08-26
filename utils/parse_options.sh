@@ -5,7 +5,7 @@
 # This script is an adapted version of:
 #   https://github.com/kaldi-asr/kaldi/blob/master/egs/wsj/s5/utils/parse_options.sh
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 cmdname=$(basename $0)
 

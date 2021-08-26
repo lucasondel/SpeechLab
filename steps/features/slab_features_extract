@@ -1,9 +1,9 @@
 #!/bin/sh -e
+cmd=$(basename $0)
 
 # SPDX-License-Identifier: MIT
 
-cmd=$(basename $0)
-
+. $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
 # Options
@@ -15,7 +15,7 @@ logdir=$PWD
 #######################################################################
 
 show_usage() {
-    echo "usage: $cmd [--compression 0-9] [--njobs N] <config> <scp> <out>"
+    echo "usage: $(basename $0) [--compression 0-9] [--njobs N] [--logdir DIR] <config> <scp> <out>"
 }
 
 show_help() {
@@ -29,7 +29,7 @@ show_help() {
     echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
-. parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 
 if [ $# -ne 3 ]; then
     show_usage 1>&2
@@ -57,7 +57,7 @@ split -n l/$njobs $scp --numeric-suffixes=1
 rename 's/x0+/x/' x*
 cd $cwd
 
-. $SLAB_ROOT/tools/features/parallel_env.sh
+. $SLAB_ROOT/steps/features/parallel_env.sh
 $parallel_cmd julia --project=$SLAB_ROOT/Project.toml \
     $SLAB_ROOT/tools/features/scripts/features.jl \
     -c $compression \
