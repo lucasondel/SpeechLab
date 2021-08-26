@@ -6,4 +6,3 @@ export PATH=$SLAB_ROOT/steps/features:$PATH
 export PATH=$SLAB_ROOT/steps/gmm:$PATH
 export PATH=$SLAB_ROOT/steps/lfmmi:$PATH
 export PATH=$SLAB_ROOT/steps/monophone:$PATH
-export PATH=$SLAB_ROOT/steps/utils:$PATH
