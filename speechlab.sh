@@ -1,9 +1,9 @@
-# SPDX-License-Identifier: MIT
+# Add the SpeechLab commands to your PATH variable. You need to define
+# the variable SLAB_ROOT (in ~/.bashrc for instance) before sourcing
+# this file.
 
-# Add the speech lab tools to the path.
-
-export PATH=$SLAB_ROOT/tools/features:$PATH
-export PATH=$SLAB_ROOT/tools/gmm:$PATH
-export PATH=$SLAB_ROOT/tools/lfmmi:$PATH
-export PATH=$SLAB_ROOT/tools/monophone:$PATH
-export PATH=$SLAB_ROOT/tools/utils:$PATH
+export PATH=$SLAB_ROOT/steps/features:$PATH
+export PATH=$SLAB_ROOT/steps/gmm:$PATH
+export PATH=$SLAB_ROOT/steps/lfmmi:$PATH
+export PATH=$SLAB_ROOT/steps/monophone:$PATH
+export PATH=$SLAB_ROOT/steps/utils:$PATH
