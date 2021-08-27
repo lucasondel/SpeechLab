@@ -2,21 +2,21 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 show_usage() {
-    echo "usage: $(basename $0) [options] <in-lexicon> <out-lexiconfsms>"
+    echo "usage: $(basename $0) <lexicontxt> <out-lexicon-fsms>"
 }
 
 show_help() {
     show_usage
     echo ""
-    echo "Make lexicon fsms (one per word) from a lexicon file."
+    echo "Make lexicon fsms (one per word) from a lexicon text file."
     echo ""
     echo "  --help -h       show this help message"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 
 if [ $# -ne 2 ]; then
     show_usage 1>&2
@@ -32,7 +32,7 @@ if [ -f $outlexicon ]; then
 fi
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/monophone/scripts/makelexicon.jl \
+    $SLAB_ROOT/steps/monophone/scripts/makelexicon.jl \
     $inlexicon \
     $outlexicon
 

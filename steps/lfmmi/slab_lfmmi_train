@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
 # Options
@@ -16,7 +16,7 @@ nworkers=4
 #######################################################################
 
 show_usage() {
-    echo "usage: $(basename $0) [options] <config> <lang-dir> <train-dir> <dev-dir> <init-model> <train-fea> <dev-fea> <out-dir>"
+    echo "usage: $(basename $0) [--use-gpu false|true] <topo> <config> <lang-dir> <train-dir> <dev-dir> <init-model> <train-fea> <dev-fea> <out-dir>"
 }
 
 show_help() {
@@ -24,36 +24,31 @@ show_help() {
     echo ""
     echo "Training a neural network using LF-MMI."
     echo ""
-    echo "  --topo-speech-unit     HMM topology file for the speech units (default: $topo_speech_unit)"
-    echo "  --topo-nonspeech-unit  HMM topology file for the non-speech units (default: $topo_nonspeech_unit)"
     echo "  --use-gpu              use a GPU to train the model (default: $use_gpu)"
     echo "  --help -h              show this help message"
     echo "  --njobs                number of parallel jobs to comile the FSMs (default: $njobs)"
     echo "  --nworkers             number of parallel workers for data loading (default: $nworkers)"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 
-if [ $# -ne 8 ]; then
+if [ $# -ne 9 ]; then
     show_usage 1>&2
     exit 1
 fi
 
-config=$1
-langdir=$2
-traindir=$3
-devdir=$4
-initmodel=$5
-trainfea=$6
-devfea=$7
-odir=$8
+topo=$1
+config=$2
+langdir=$3
+traindir=$4
+devdir=$5
+initmodel=$6
+trainfea=$7
+devfea=$8
+odir=$9
 
 echo "--> Build the HMM components for each basic units."
-slab_monophone_mkhmms \
-    $topo_speech_unit \
-    $topo_nonspeech_unit \
-    $langdir/units \
-    $odir/hmms.jld2
+slab_monophone_mkhmms $topo $langdir/units $odir/hmms.jld2
 
 echo "--> Build the pronunciation fsms."
 slab_monophone_mklexicon \

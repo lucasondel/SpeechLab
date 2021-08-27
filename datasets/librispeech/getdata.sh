@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 show_usage() {
     echo "usage: $(basename $0) <url> <part> <out-dir>"
@@ -17,7 +17,7 @@ show_help() {
 }
 
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 if [ $# -ne 3 ]; then
     show_usage 1>&2
     exit 1

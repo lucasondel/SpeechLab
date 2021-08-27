@@ -5,7 +5,7 @@
 # This script is adapted from:
 # https://github.com/kaldi-asr/kaldi/blob/master/egs/librispeech/s5/local/data_prep.sh
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 show_usage() {
     echo "usage: $(basename $0) <part-dir> <out-dir>"
@@ -19,7 +19,7 @@ show_help() {
     echo "  -h, --help      show this help message"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 if [ $# -ne 2 ]; then
     show_usage 1>&2
     exit 1

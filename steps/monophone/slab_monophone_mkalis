@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
 # Options
@@ -26,7 +26,7 @@ show_help() {
     echo "  --njobs         number of parallel jobs (default: $njobs)"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 if [ $# -ne 4 ]; then
     show_usage 1>&2
     exit 1
@@ -50,9 +50,9 @@ split -n l/$njobs $trans --numeric-suffixes=1
 rename 's/x0+/x/' x*
 cd $cwd
 
-. $SLAB_ROOT/tools/monophone/parallel_env.sh
+. $SLAB_ROOT/steps/monophone/parallel_env.sh
 $parallel_cmd_alis julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/monophone/scripts/makealis.jl \
+    $SLAB_ROOT/steps/monophone/scripts/makealis.jl \
     $hmms \
     $lexicon \
     $tmp/x\$SGE_TASK_ID \
@@ -60,7 +60,7 @@ $parallel_cmd_alis julia --project=$SLAB_ROOT/Project.toml \
 
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/monophone/scripts/concatalis.jl \
+    $SLAB_ROOT/steps/monophone/scripts/concatalis.jl \
     $out \
     $tmp/[1-9]*jld2
 

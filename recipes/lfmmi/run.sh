@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
 # Settings
@@ -45,11 +45,10 @@ echo "Training"
 echo "================================================================"
 mkdir -p $expdir/train
 slab_lfmmi_train \
-    --topo-nonspeech-unit conf/topo_unit.toml \
-    --topo-speech-unit conf/topo_unit.toml \
     --use-gpu true \
     --njobs 10 \
     --nworkers 4 \
+    conf/topo_unit.toml \
     conf/train_config.toml \
     $datasetdir/lang \
     $datasetdir/train \

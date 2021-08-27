@@ -26,12 +26,12 @@ function main(args)
         for arch in archives
             jldopen(arch, "r") do farchive
                 for uttid in keys(farchive)
-                    f["$uttid/cfsm"] = farchive["$uttid"]["cfsm"]
-                    f["$uttid/labels"] = farchive["$uttid"]["labels"]
+                    f["$uttid"] = farchive["$uttid"]
                 end
             end
         end
     end
+
 end
 
 args = parse_commandline()

@@ -2,33 +2,31 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 show_usage() {
-    echo "usage: $(basename $0) [options] <su_config> <nsu_config> <listunits> <hmms>"
+    echo "usage: $(basename $0) <topo> <units> <out-hmms>"
 }
 
 show_help() {
     show_usage
     echo ""
-    echo "Make a set of HMMs for speech units. "
-    echo "<su_config> and <nsu_config> are the hmms' topology for the "
-    echo "'speech-unit' and 'non-speech-unit' categories."
+    echo "Build a set of HMMs for the units in <unit> based on the"
+    echo "topology file <topo>."
     echo ""
     echo "  --help -h       show this help message"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 
-if [ $# -ne 4 ]; then
+if [ $# -ne 3 ]; then
     show_usage 1>&2
     exit 1
 fi
 
-su_config=$1 && assert_not_missing $su_config
-nsu_config=$2 && assert_not_missing $nsu_config
-listunits=$3
-hmms=$4
+topo=$1 && assert_not_missing $su_config
+units=$2
+hmms=$3
 
 if [ -f $hmms ]; then
     echo "The hmms are already built in $hmms."
@@ -36,9 +34,5 @@ if [ -f $hmms ]; then
 fi
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/monophone/scripts/makehmms.jl \
-    -t $nsu_config \
-    $su_config \
-    $listunits \
-    $hmms
+    $SLAB_ROOT/steps/monophone/scripts/makehmms.jl $topo $units $hmms
 

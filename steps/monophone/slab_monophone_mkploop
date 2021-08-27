@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
 # Options
@@ -26,7 +26,7 @@ show_help() {
     echo "  --start-sil     phone-loop starts with a non-speech unit (default: $start_sil)"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 
 if [ $# -ne 2 ]; then
     show_usage 1>&2
@@ -45,7 +45,7 @@ fi
 [ $end_sil=yes ] && eopt="-e"
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/monophone/scripts/makephoneloop.jl \
+    $SLAB_ROOT/steps/monophone/scripts/makephoneloop.jl \
     $sopt $eopt \
     $hmms \
     $ploop

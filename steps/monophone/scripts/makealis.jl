@@ -29,13 +29,10 @@ end
 function main(args)
     hmmsdata = load(args["hmms"])
     lexicon = load(args["lexiconfsm"])
-    su_hmms = hmmsdata["speech_units"]
-    nsu_hmms = hmmsdata["non_speech_units"]
-    num_pdfs = hmmsdata["num_pdfs"]
-    hmms = merge(su_hmms, nsu_hmms)
+    hmms = hmmsdata["units"]
+    pdfid_mapping = hmmsdata["pdfid_mapping"]
 
     SF = LogSemifield{Float32}
-
     jldopen(args["alifsms"], "w") do f
         open(args["ali"], "r") do rf
 
@@ -59,14 +56,13 @@ function main(args)
                     end
                     prev = s
                 end
+                @show keys(hmms)
+                @show keys(pdfid_mapping)
 
                 # G: Grammar L: Lexicon H: HMM
                 GL = HierarchicalFSM(fsm |> renormalize, lexicon)
                 GLH = HierarchicalFSM(GL, hmms)
-                println("MatrixFSM()")
-                #cfsm = MatrixFSM()
-                #f["$uttid/cfsm"] = cfsm
-                #f["$uttid/labels"] = labels
+                f["$uttid"] = MatrixFSM(GLH, pdfid_mapping, t -> (t[2], t[3]))
             end
         end
     end

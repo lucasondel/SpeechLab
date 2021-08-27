@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: MIT
 
-. $SLAB_ROOT/tools/utils/misc.sh
+. $SLAB_ROOT/utils/misc.sh
 scriptdir=$SLAB_ROOT/datasets/mini_librispeech
 
 MINI_LIBRISPEECH_URL=https://www.openslr.org/resources/31
@@ -21,7 +21,7 @@ show_help() {
     echo "  -h, --help      show this help message"
 }
 
-. $SLAB_ROOT/tools/utils/parse_options.sh
+. $SLAB_ROOT/utils/parse_options.sh
 if [ $# -ne 1 ]; then
     show_usage 1>&2
     exit 1
@@ -62,9 +62,9 @@ echo '<UNK>\tSPN' >> $langdir/lexicon
 python $scriptdir/filter_lexicon.py $localdir/lms/librispeech-lexicon.txt \
     | sort | uniq >> $langdir/lexicon
 
-echo "SIL\tnonspeech-unit" > $langdir/units
-echo "SPN\tnonspeech-unit" >> $langdir/units
+echo "SIL\tnonspeech-unit\tsilence" > $langdir/units
+echo "SPN\tspeech-unit\tspoken-noise" >> $langdir/units
 while read line; do
-    echo "$line\tspeech-unit"
+    echo "$line\tspeech-unit\tphone"
 done <$scriptdir/cmudict_phones >> $langdir/units
 
