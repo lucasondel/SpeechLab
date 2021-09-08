@@ -12,7 +12,7 @@ windowpower = 0.85
 nfilters = 40
 lofreq = 40
 hifreq = 7600
-addenergy = true
+addenergy = false
 nceps = 40
 liftering = 22
 

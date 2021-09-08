@@ -14,7 +14,7 @@ show_help() {
     echo "Build a set of HMMs for the units in <unit> based on the"
     echo "topology file <topo>."
     echo ""
-    echo "  --help -h       show this help message"
+    echo "  -h, --help      show this help message"
 }
 
 . $SLAB_ROOT/utils/parse_options.sh
@@ -34,5 +34,5 @@ if [ -f $hmms ]; then
 fi
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/steps/monophone/scripts/makehmms.jl $topo $units $hmms
+    $SLAB_ROOT/steps/hmm/scripts/makehmms.jl $topo $units $hmms
 

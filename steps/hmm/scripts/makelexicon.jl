@@ -36,6 +36,7 @@ function LinearFSM(seq)
         initweight = i == 1 ? one(SF) : zero(SF)
         finalweight = i == length(seq) ? one(SF) : zero(SF)
         s = addstate!(fsm, label; initweight, finalweight)
+        i > 1 && addarc!(fsm, prev, s)
         prev = s
     end
 

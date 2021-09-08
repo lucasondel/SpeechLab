@@ -58,15 +58,16 @@ function parse_commandline()
     parse_args(s)
 end
 
-function load(file)
-    units = Dict()
+function loadunits(file)
+    units, categories = [], []
     open(file, "r") do f
         for line in eachline(f)
             tokens = split(line)
-            units[tokens[1]] = tokens[2:end]
+            push!(units, tokens[1])
+            push!(categories, tokens[2:end])
         end
     end
-    units
+    units, categories
 end
 
 function get_unit_topo(topo, category)
@@ -103,12 +104,12 @@ end
 function main(args)
     topo = TOML.parsefile(args["topology"])
 
-    unit2category = load(args["units"])
+    units, categories = loadunits(args["units"])
     hmms = Dict()
     pdfid_mapping = Dict()
     pdfid = 1
-    for unit in keys(unit2category)
-        unit_topo = get_unit_topo(topo, unit2category[unit])
+    for (unit, category) in zip(units, categories)
+        unit_topo = get_unit_topo(topo, category)
         hmms[unit], pdfid = makehmm!(pdfid_mapping, unit, topo, pdfid)
     end
 

@@ -15,7 +15,8 @@ logdir=$PWD
 #######################################################################
 
 show_usage() {
-    echo "usage: $(basename $0) [--compression 0-9] [--njobs N] [--logdir DIR] <config> <scp> <out>"
+    echo "usage: $(basename $0) [--compression 0-9] [--njobs N] [--logdir DIR]"
+    echo "                             config scp out"
 }
 
 show_help() {
@@ -59,14 +60,14 @@ cd $cwd
 
 . $SLAB_ROOT/steps/features/parallel_env.sh
 $parallel_cmd julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/features/scripts/features.jl \
+    $SLAB_ROOT/steps/features/scripts/features.jl \
     -c $compression \
     $config \
     $tmp/x\$SGE_TASK_ID \
     $tmp/\$SGE_TASK_ID.h5
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/tools/features/scripts/concat.jl \
+    $SLAB_ROOT/steps/features/scripts/concat.jl \
     -c $compression \
     $out \
     $tmp/[1-9]*h5

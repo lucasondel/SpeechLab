@@ -1,0 +1,13 @@
+# 2-states FSM topology for an acoustic unit.
+# For LF-MMI, there is no difference between speech/nonspeech units.
+
+states = [
+    { initweight = 1.0, finalweight = 0.0 },
+    { initweight = 0.0, finalweight = 1.0 },
+]
+
+arcs = [
+    { src = 1, dest = 1, weight = 0.5 },
+    { src = 1, dest = 2, weight = 0.5 },
+]
+

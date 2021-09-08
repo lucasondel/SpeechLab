@@ -56,8 +56,6 @@ function main(args)
                     end
                     prev = s
                 end
-                @show keys(hmms)
-                @show keys(pdfid_mapping)
 
                 # G: Grammar L: Lexicon H: HMM
                 GL = HierarchicalFSM(fsm |> renormalize, lexicon)

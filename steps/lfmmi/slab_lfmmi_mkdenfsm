@@ -1,0 +1,63 @@
+#!/bin/sh -e
+
+# SPDX-License-Identifier: MIT
+
+. $SLAB_ROOT/utils/misc.sh
+
+#######################################################################
+# Options
+
+sil_sym="<SIL>"
+oov_sym="<UNK>"
+between_silprob=0.1
+edge_silprob=0.8
+
+#######################################################################
+
+show_usage() {
+    echo "usage: $(basename $0) [--between-silprob P] [--edge-silprob P]"
+    echo "                           [--oov-sym S] [--sil-sym S]"
+    echo "                           <ngram-order> <hmms> <lexicon> <text> <out-denfsm>"
+}
+
+show_help() {
+    show_usage
+    echo ""
+    echo "Estimate a phonotactic language model without pruning"
+    echo "and represent it as an FSM."
+    echo ""
+    echo "  --between-silprob      probability to insert silence between words (default: $between_silprob)"
+    echo "  --edge-silprob         probability to insert silence at the edge of the utterance(default: $edge_silprob)"
+    echo "  -h, --help             show this help message"
+    echo "  --oov-sym              OOV symbol (default: $oov_sym)"
+    echo "  --sil-sym              silence symbol (default: $sil_sym)"
+}
+
+. $SLAB_ROOT/utils/parse_options.sh
+
+if [ $# -ne 5 ]; then
+    show_usage 1>&2
+    exit 1
+fi
+
+order=$1
+hmms=$2
+lexicon=$3
+text=$4
+outdenfsm=$5
+
+if [ -f $outdenfsm ]; then
+    echo "The denominator fsm is already built in $outdenfsm."
+    exit 0
+fi
+
+cat $text | julia --project=$SLAB_ROOT $SLAB_ROOT/steps/lfmmi/scripts/mkdenfsm.jl \
+    --between-silprob $between_silprob \
+    --edge-silprob $edge_silprob \
+    --oov-sym $oov_sym \
+    --sil-sym $sil_sym \
+    --ngram-order $order \
+    $hmms \
+    $lexicon \
+    $outdenfsm
+

@@ -12,11 +12,16 @@ topo_nonspeech_unit=$SLAB_ROOT/tools/lfmmi/conf/hmm_nonspeechunit.toml
 use_gpu=false
 njobs=4
 nworkers=4
+checkpoint_dir=checkpoints
+from_checkpoint=""
 
 #######################################################################
 
 show_usage() {
-    echo "usage: $(basename $0) [--use-gpu false|true] <topo> <config> <lang-dir> <train-dir> <dev-dir> <init-model> <train-fea> <dev-fea> <out-dir>"
+    echo "usage: $(basename $0) [--njobs N] [--nworkers W] [--from-checkpoint PATH]"
+    echo "                        [--checkpoint-dir DIR] [--use-gpu true|false] "
+    echo "                        modelfile config modelconfig trainfea devfea"
+    echo "                        train_numfsm dev_numfsm denfsm initmodel out-dir"
 }
 
 show_help() {
@@ -24,76 +29,46 @@ show_help() {
     echo ""
     echo "Training a neural network using LF-MMI."
     echo ""
-    echo "  --use-gpu              use a GPU to train the model (default: $use_gpu)"
+    echo "  --checkpoint-dir       directory where to store checkpoints (default: $checkpoint_dir)"
+    echo " --from-checkpoint       start training from the given checkpoint file (default: $from_checkpoint)"
     echo "  --help -h              show this help message"
     echo "  --njobs                number of parallel jobs to comile the FSMs (default: $njobs)"
     echo "  --nworkers             number of parallel workers for data loading (default: $nworkers)"
+    echo "  --use-gpu              use a GPU to train the model (default: $use_gpu)"
 }
 
 . $SLAB_ROOT/utils/parse_options.sh
 
-if [ $# -ne 9 ]; then
+if [ $# -ne 10 ]; then
     show_usage 1>&2
     exit 1
 fi
 
-topo=$1
+modelfile=$1
 config=$2
-langdir=$3
-traindir=$4
-devdir=$5
-initmodel=$6
-trainfea=$7
-devfea=$8
-odir=$9
+modelconfig=$3
+trainfea=$4
+devfea=$5
+train_numfsm=$6
+dev_numfsm=$7
+denfsm=$8
+initmodel=$9
+odir=$10
 
-echo "--> Build the HMM components for each basic units."
-slab_monophone_mkhmms $topo $langdir/units $odir/hmms.jld2
-
-echo "--> Build the pronunciation fsms."
-slab_monophone_mklexicon \
-    $langdir/lexicon \
-    $odir/lexicon.fsms.jld2
-
-echo "--> Compile the numerator fsms (train set)."
-logdir=$odir/logs/align_train
-rm -fr $logdir && mkdir -p $odir/logs/align_train
-slab_monophone_mkalis \
-    --logdir $logdir \
-    --njobs $njobs \
-    $odir/hmms.jld2 \
-    $odir/lexicon.fsms.jld2 \
-    $traindir/trans.wrd \
-    $odir/train_numerator_fsms.jld2
-
-echo "--> Compile the numerator fsms (dev set)."
-logdir=$odir/logs/align_dev
-rm -fr $logdir && mkdir -p $odir/logs/align_train
-slab_monophone_mkalis \
-    --logdir $logdir \
-    --njobs $njobs \
-    $odir/hmms.jld2 \
-    $odir/lexicon.fsms.jld2 \
-    $devdir/trans.wrd \
-    $odir/dev_numerator_fsms.jld2
-
-echo "--> Compile the denominator fsm."
-slab_monophone_mkploop \
-    --start-sil true  \
-    --end-sil true \
-    $odir/hmms.jld2 \
-    $odir/denominator_fsm.jld2
-
-
-echo "--> Train $initmodel."
 $use_gpu && gpu_opt="--use-gpu"
-julia -t $((nworkers+1)) --project=@. $SLAB_ROOT/tools/lfmmi/scripts/train.jl \
+#JULIA_DEBUG=Main JULIA_CUDA_VERSION=11.3 JULIA_CUDA_MEMORY_POOL=cuda \
+julia -t $((nworkers+1)) --project=$SLAB_ROOT $SLAB_ROOT/steps/lfmmi/scripts/train.jl \
+    --from-checkpoint "$from_checkpoint" \
+    --checkpoint-dir $checkpoint_dir \
     $gpu_opt \
+    $modelfile \
     $config \
+    $modelconfig \
     $trainfea \
     $devfea \
-    $odir/train_numerator_fsms.jld2 \
-    $odir/dev_numerator_fsms.jld2 \
-    $odir/denominator_fsm.jld2 \
+    $train_numfsm \
+    $dev_numfsm \
+    $denfsm \
     $initmodel \
     $odir
+

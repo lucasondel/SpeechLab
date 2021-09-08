@@ -32,7 +32,7 @@ if [ -f $outlexicon ]; then
 fi
 
 julia --project=$SLAB_ROOT/Project.toml \
-    $SLAB_ROOT/steps/monophone/scripts/makelexicon.jl \
+    $SLAB_ROOT/steps/hmm/scripts/makelexicon.jl \
     $inlexicon \
     $outlexicon
 
