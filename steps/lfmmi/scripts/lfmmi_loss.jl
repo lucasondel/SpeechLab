@@ -1,18 +1,21 @@
 # SPD-License-Identifier: MIT
 
-function lfmmi_loss(ϕ, numerator_fsms, denominator_fsms, seqlengths)
-    GC.gc()
+using AutoGrad
+
+function _lfmmi_loss(ϕ, numfsm, denfsm, seqlengths)
     ϕ = clamp.(ϕ, -30, 30)
-    γ_num, ttl_num = pdfposteriors(numerator_fsms, ϕ, seqlengths)
-    γ_den, ttl_den = pdfposteriors(denominator_fsms, ϕ, seqlengths)
+    γ_num, ttl_num = pdfposteriors(numfsm, ϕ, seqlengths)
+    γ_den, ttl_den = pdfposteriors(denfsm, ϕ, seqlengths)
     K, N, B = size(ϕ)
     loss = -sum((ttl_num .- ttl_den))
-    grad = -(γ_num .- γ_den)
-    loss, grad
+    loss, γ_num, γ_den
 end
 
-Zygote.@adjoint function lfmmi_loss(ϕ, numerator_fsms, denominator_fsms,
-                                    seqlengths)
-    loss, grad = lfmmi_loss(ϕ, numerator_fsms, denominator_fsms, seqlengths)
-    loss, Δ -> (Δ .* grad, nothing, nothing, nothing)
+function _∇lfmmi_loss(dy, loss, γ_num, γ_den)
+    -(γ_num .- γ_den)
 end
+
+@primitive1 _lfmmi_loss(ϕ, numf, denf, slen),dy,y (dy[1] * _∇lfmmi_loss(dy, y...))
+
+lfmmi_loss(ϕ, numfsm, denfsm, seqlengths) =
+    _lfmmi_loss(ϕ, numfsm, denfsm, seqlengths)[1] # return the loss only

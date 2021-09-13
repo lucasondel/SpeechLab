@@ -56,7 +56,7 @@ initmodel=$9
 odir=$10
 
 $use_gpu && gpu_opt="--use-gpu"
-#JULIA_DEBUG=Main JULIA_CUDA_VERSION=11.3 JULIA_CUDA_MEMORY_POOL=cuda \
+JULIA_DEBUG=Main JULIA_CUDA_VERSION=10.2 \
 julia -t $((nworkers+1)) --project=$SLAB_ROOT $SLAB_ROOT/steps/lfmmi/scripts/train.jl \
     --from-checkpoint "$from_checkpoint" \
     --checkpoint-dir $checkpoint_dir \

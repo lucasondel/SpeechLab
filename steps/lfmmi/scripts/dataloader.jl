@@ -18,7 +18,7 @@ function BatchLoader(h5data, alifsms, batchsize; shuffledata = false)
     uttids = if shuffledata
         shuffle(collect(keys(h5data)))
     else
-        sort(keys(h5data), by = k -> size(h5data[k], 2))
+        sort(keys(h5data), rev = true, by = k -> size(h5data[k], 2))
     end
     BatchLoader(h5data, alifsms, batchsize, uttids)
 end

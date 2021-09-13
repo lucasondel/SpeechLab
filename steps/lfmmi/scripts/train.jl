@@ -1,17 +1,15 @@
 # SPD-License-Identifier: MIT
 
 using ArgParse
+using AutoGrad
 using CUDA
 using Dates
-using Flux
 using HDF5
 using JLD2
+using Knet
 using MarkovModels
 using Random
 using TOML
-using Zygote
-
-CUDA.allowscalar(false)
 
 # Data loader to load batch of utterances.
 include("dataloader.jl")
@@ -19,38 +17,48 @@ include("dataloader.jl")
 # Differentiable LF-MMI objective function.
 include("lfmmi_loss.jl")
 
-function train!(model, batchloader, denfsm, opt, θ, use_gpu, getlengths)
+function train!(model, batchloader, denfsm, opts, θ, use_gpu, getlengths)
     trainmode!(model)
 
     acc_loss::Float64 = 0
     N = 0
 
+    t₀ = now()
     for (i, (batch_data, batch_nums, inlengths)) in enumerate(batchloader)
+        t₁ = now()
+        @debug "Batch load time: $((t₁ - t₀).value / 1000) seconds"
+
+        CUDA.memory_status()
+        println()
+        GC.gc(true)
+        CUDA.memory_status()
+        println()
+
         seqlengths = getlengths(inlengths)
 
         batch_dens = union([denfsm for i in 1:size(batch_data, 3)]...)
         if use_gpu
-            batch_data = cu(batch_data)
+            batch_data = CuArray(batch_data)
             batch_nums = MarkovModels.gpu(batch_nums)
         end
 
-        @debug "seqlengths $seqlengths"
-        @debug "$(size(batch_data))"
-        @debug "typeof(batch_data) = $(typeof(batch_data))"
+        L = @diff lfmmi_loss(model(batch_data), batch_nums, batch_dens, seqlengths)
 
-        L, gs = withgradient(θ) do
-            lfmmi_loss(model(batch_data), batch_nums, batch_dens, seqlengths)
-        end
-        Flux.update!(opt, θ, gs)
+        update!(value.(θ), grad.([L], θ), opts)
 
-        acc_loss += L / sum(seqlengths)
+        acc_loss += value(L) / sum(seqlengths)
         N += 1
+
+        # Remove the variable from the scope to free memory.
+        L = nothing
+
+        t₀ = now()
     end
 
     acc_loss / N
 end
 
-function test!(model, batchloader, denfsm, opt, θ, use_gpu, getlengths)
+function test!(model, batchloader, denfsm, use_gpu, getlengths)
     testmode!(model)
 
     acc_loss::Float64 = 0
@@ -66,7 +74,7 @@ function test!(model, batchloader, denfsm, opt, θ, use_gpu, getlengths)
             batch_nums = MarkovModels.gpu(batch_nums)
         end
 
-        L, _ = lfmmi_loss(model(batch_data), batch_nums, batch_dens, seqlengths)
+        L = lfmmi_loss(model(batch_data), batch_nums, batch_dens, seqlengths)
 
         acc_loss += L
         N += sum(seqlengths)
@@ -97,19 +105,20 @@ function main(args)
     denfsm = load(args["denfsm"])["fsm"]
 
     model = isnothing(ckpt) ? load(args["model"])["model"] : ckpt["model"]
-    opt = isnothing(ckpt) ? getoptimizer(conf) : ckpt["optimizer"]
-    scheduler = isnothing(ckpt) ? getscheduler(conf) : ckpt["scheduler"]
-    best_loss = isnothing(ckpt) ? Float32(Inf) : ckpt["best_loss"]
-    startepoch = isnothing(ckpt) ? 1 : ckpt["epoch"]+1
+
 
     @debug "model = $model"
 
     if args["use-gpu"]
-        model = fmap(cu, model)
+        model = model |> gpu
         denfsm = denfsm |> MarkovModels.gpu
     end
 
-    θ = Flux.params(model)
+    θ = params(model)
+    opts = isnothing(ckpt) ? [getoptimizer(conf) for p in θ] : ckpt["optimizers"]
+    scheduler = isnothing(ckpt) ? getscheduler(conf) : ckpt["scheduler"]
+    best_loss = isnothing(ckpt) ? Float32(Inf) : ckpt["best_loss"]
+    startepoch = isnothing(ckpt) ? 1 : ckpt["epoch"]+1
     for epoch in startepoch:epochs
         t₀ = now()
 
@@ -122,21 +131,20 @@ function main(args)
 
         h5open(args["train"], "r") do trainfea
             trainbl = BatchLoader(trainfea, train_numfsms, mbsize; shuffledata)
-            train_loss = train!(model, trainbl, denfsm, opt, θ, use_gpu,
+            train_loss = train!(model, trainbl, denfsm, opts, θ, use_gpu,
                                 getlengths_fn)
         end
 
         h5open(args["dev"], "r") do devfea
             devbl = BatchLoader(devfea, dev_numfsms, mbsize)
-            dev_loss = test!(model, devbl, denfsm, opt, θ, use_gpu,
-                             getlengths_fn)
+            dev_loss = test!(model, devbl, denfsm, use_gpu, getlengths_fn)
         end
 
-        update!(scheduler, opt, dev_loss)
+        update_scheduler!(scheduler, opts, dev_loss)
 
         checkpoint = Dict(
             "model" => model |> cpu,
-            "optimizer" => opt,
+            "optimizers" => opts,
             "epoch" => epoch,
             "best_loss" => best_loss,
             "scheduler" => scheduler
@@ -202,7 +210,7 @@ function parse_commandline()
             help = "denominator graph"
         "model"
             required = true
-            help = "input Flux model saved in BSON format"
+            help = "input model saved in JLD2 format"
         "out"
             required = true
             help = "output model"
