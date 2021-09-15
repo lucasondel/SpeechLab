@@ -15,6 +15,3 @@ hifreq = 7600
 addenergy = false
 nceps = 40
 liftering = 22
-
-[Normalization]
-mean_norm = true

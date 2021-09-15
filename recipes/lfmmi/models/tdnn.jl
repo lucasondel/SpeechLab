@@ -84,7 +84,7 @@ function update_scheduler!(s::PlateauScheduler, opts, loss)
         s.nsteps = 0
         s.best_loss = loss
     elseif s.nsteps > s.patience
-        @debug "$(s.nsteps) epoch(s) without improvement, setting learning rate to: $(opt.eta)"
+        @debug "$(s.nsteps) epoch(s) without improvement, setting learning rate to: $(opts[1].lr)"
         for opt in opts opt.lr = opt.lr * s.factor end
         s.nsteps = 0
     end

@@ -1,0 +1,56 @@
+#!/bin/sh -e
+
+. $SLAB_ROOT/utils/misc.sh
+
+#######################################################################
+# Options
+
+use_gpu=false
+batch_size=100
+
+#######################################################################
+
+show_usage() {
+    echo "usage: $(basename $0) [--use-gpu true|false] [--batch-size SIZE] "
+    echo "                       modelfile modelconfig model features out"
+}
+
+show_help() {
+    show_usage
+    echo ""
+    echo "Dump the output of a neural network to a HDF5 archive."
+    echo ""
+    echo "  --batch-size           batch size (default: $batch_size)"
+    echo "  -h, --help             show this help message"
+    echo "  --use-gpu              use a GPU to compute the model's output (default: $use_gpu)"
+}
+
+. $SLAB_ROOT/utils/parse_options.sh
+
+if [ $# -ne 5 ]; then
+    show_usage 1>&2
+    exit 1
+fi
+
+modelfile=$1
+modelconfig=$2
+model=$3
+features=$4
+out=$5
+
+$use_gpu && gpu_opt="--use-gpu"
+
+if [ ! -f $out ]; then
+    JULIA_CUDA_VERSION=10.2 \
+    julia --project=$SLAB_ROOT $SLAB_ROOT/steps/lfmmi/scripts/dump.jl \
+        $gpu_opt \
+        --batch-size $batch_size \
+        $modelfile \
+        $modelconfig \
+        $model \
+        $features \
+        $out
+else
+    echo "Model's output already dumped in $out."
+fi
+

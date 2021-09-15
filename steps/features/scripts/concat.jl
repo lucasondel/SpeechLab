@@ -37,7 +37,7 @@ function main(args)
         for arch in archives
             h5open(arch, "r") do farchive
                 for k in keys(farchive["/"])
-                    f[k, compress = args["compression-level"]] = read(farchive[k])
+                    write(f, k, read(farchive[k]))
                 end
             end
         end

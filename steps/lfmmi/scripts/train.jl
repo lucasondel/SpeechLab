@@ -23,19 +23,8 @@ function train!(model, batchloader, denfsm, opts, θ, use_gpu, getlengths)
     acc_loss::Float64 = 0
     N = 0
 
-    t₀ = now()
     for (i, (batch_data, batch_nums, inlengths)) in enumerate(batchloader)
-        t₁ = now()
-        @debug "Batch load time: $((t₁ - t₀).value / 1000) seconds"
-
-        CUDA.memory_status()
-        println()
-        GC.gc(true)
-        CUDA.memory_status()
-        println()
-
         seqlengths = getlengths(inlengths)
-
         batch_dens = union([denfsm for i in 1:size(batch_data, 3)]...)
         if use_gpu
             batch_data = CuArray(batch_data)
@@ -49,10 +38,8 @@ function train!(model, batchloader, denfsm, opts, θ, use_gpu, getlengths)
         acc_loss += value(L) / sum(seqlengths)
         N += 1
 
-        # Remove the variable from the scope to free memory.
+        # Remove the variable from the scope to free the memory.
         L = nothing
-
-        t₀ = now()
     end
 
     acc_loss / N
@@ -166,9 +153,6 @@ function main(args)
                 "dev_loss=$(round(dev_loss, digits = 4)) " *
                 "epoch_duration=$((t₁ - t₀).value/1000)")
     end
-
-    @debug "Saving final model to $(args["out"])."
-    save(args["out"], Dict("model" => model |> cpu))
 end
 
 

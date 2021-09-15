@@ -27,7 +27,7 @@ trainconfig=conf/train.toml
 ## Experiment output ##
 #expdir=exp/$dataset/${ngram_order}gram
 expdir=exp/$dataset #/${ngram_order}gram
-logdir=$expdir/logs
+graphsdir=$expdir/graphs
 
 #######################################################################
 
@@ -39,9 +39,9 @@ echo "================================================================"
 
 for dir in $traindir $devdir $testdir; do
     setname=$(basename $dir)
-    mkdir -p $logdir/fea-extract-$setname
+    logdir=$feadir/$setname/logs/${featype} && mkdir -p $logdir
     slab_features_extract \
-        --logdir $logdir/fea-extract-$setname \
+        --logdir $logdir \
         --njobs 10 \
         $feaconfig \
         $dir/wav.scp \
@@ -52,28 +52,30 @@ echo "================================================================"
 echo "Graph (numerator/denominator) preparation"
 echo "================================================================"
 
+mkdir -p $graphsdir
+
 echo "--> Build the HMM components for each unit."
 slab_hmm_mkhmms \
     conf/topo_unit.toml \
     $langdir/units \
-    $expdir/hmms.jld2
+    $graphsdir/hmms.jld2
 
 echo "--> Build the pronunciation FSMs."
 slab_hmm_mklexicon \
     $langdir/lexicon \
-    $expdir/lexicon_fsms.jld2
+    $graphsdir/lexicon_fsms.jld2
 
 for dir in $traindir $devdir; do
     dname=$(basename $dir)
     echo "--> Compile the numerator FSMs ($dname set)."
-    mkdir -p $logdir/make-alis-$dname
+    logdir=$graphsdir/logs/make-alis-${dname} && mkdir -p $logdir
     slab_hmm_mkalis \
-        --logdir $logdir/make-alis-$dname \
+        --logdir $logdir \
         --njobs 10 \
-        $expdir/hmms.jld2 \
-        $expdir/lexicon_fsms.jld2 \
+        $graphsdir/hmms.jld2 \
+        $graphsdir/lexicon_fsms.jld2 \
         $dir/trans.wrd \
-        $expdir/${dname}_numerator_fsms.jld2
+        $graphsdir/${dname}_numerator_fsms.jld2
 done
 
 echo "--> Build the denominator FSM."
@@ -81,54 +83,65 @@ slab_lfmmi_mkdenfsm \
     --between-silprob 0.1 \
     --edge-silprob 0.8 \
     $ngram_order \
-    $expdir/hmms.jld2 \
+    $graphsdir/hmms.jld2 \
     $langdir/lexicon \
     $traindir/trans.wrd \
-    $expdir/den_fsm.jld2
+    $graphsdir/den_fsm.jld2
 
 echo "================================================================"
 echo "Training"
 echo "================================================================"
 
 mkdir -p $expdir/train
+mkdir -p $expdir/train/checkpoints
+
+initmodel=$expdir/train/init.jld2
+finalmodel=$expdir/train/final.jld2
 
 echo "--> Create the initial model using $modelfile."
-initmodel=$expdir/train/init.jld2
-if [ ! -f $initmodel ]; then
-    julia --project scripts/mkmodel.jl \
-        $modelfile \
-        $modelconfig \
-        $feadir/$(basename $traindir)/${featype}.h5 \
-        $expdir/hmms.jld2 \
-        $initmodel
-else
-    echo "Initial model already created in $initmodel"
-fi
-
-# Check if there is a checkpoint.
-last_ckpt=$expdir/train/checkpoints/last.jld2
-[ -f $last_ckpt ] && ckpt_opts="--from-checkpoint $last_ckpt"
+slab_lfmmi_mkmodel \
+    $modelfile \
+    $modelconfig \
+    $feadir/$(basename $traindir)/${featype}.h5 \
+    $graphsdir/hmms.jld2 \
+    $initmodel
 
 echo "--> Starting training..."
-finalmodel=$expdir/train/final.jld2
-if [ ! -f $finalmodel ]; then
-    slab_lfmmi_train \
-        --checkpoint-dir $expdir/train/checkpoints \
-        $ckpt_opts \
-        --use-gpu true \
-        --njobs 10 \
-        --nworkers 4 \
-        $modelfile \
-        $trainconfig \
-        $modelconfig \
-        $feadir/$(basename $traindir)/${featype}.h5 \
-        $feadir/$(basename $devdir)/${featype}.h5 \
-        $expdir/$(basename $traindir)_numerator_fsms.jld2 \
-        $expdir/$(basename $devdir)_numerator_fsms.jld2 \
-        $expdir/den_fsm.jld2 \
-        $initmodel \
-        $finalmodel
-else
-    echo "Model already trained in $initmodel"
-fi
+logfile=$expdir/train/training.log
+echo "Training started at $(date)." > $logfile
+slab_lfmmi_train \
+    --checkpoint-dir $expdir/train/checkpoints \
+    $ckpt_opts \
+    --use-gpu true \
+    $modelfile \
+    $trainconfig \
+    $modelconfig \
+    $feadir/$(basename $traindir)/${featype}.h5 \
+    $feadir/$(basename $devdir)/${featype}.h5 \
+    $graphsdir/$(basename $traindir)_numerator_fsms.jld2 \
+    $graphsdir/$(basename $devdir)_numerator_fsms.jld2 \
+    $graphsdir/den_fsm.jld2 \
+    $initmodel \
+    $finalmodel | tee -a $logfile
+    echo "Finished training at $(date)." >> $logfile
 
+echo "================================================================"
+echo "Generating output"
+echo "================================================================"
+
+mkdir -p $expdir/output
+
+echo "--> Dumping model's output."
+slab_lfmmi_dump \
+    --use-gpu true \
+    --batch-size 200 \
+    $modelfile \
+    $modelconfig \
+    $finalmodel \
+    $feadir/$(basename $testdir)/${featype}.h5 \
+    $expdir/output/$(basename $testdir).h5
+
+echo "--> Converting to Kaldi format."
+python h5_to_kaldi.py \
+    $expdir/output/$(basename $testdir).h5 \
+    $expdir/output/$(basename $testdir).ark

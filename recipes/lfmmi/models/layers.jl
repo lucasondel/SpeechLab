@@ -155,3 +155,11 @@ end
 
 reallocate(chain::Chain, atype) = Chain((reallocate.(chain.layers, atype))...)
 
+function Base.show(io::IO, c::Chain)
+    println(io, "Chain(")
+    for layer in c.layers
+        println(layer)
+    end
+    print(io, ")")
+end
+

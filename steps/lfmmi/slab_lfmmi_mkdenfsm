@@ -1,7 +1,5 @@
 #!/bin/sh -e
 
-# SPDX-License-Identifier: MIT
-
 . $SLAB_ROOT/utils/misc.sh
 
 #######################################################################
