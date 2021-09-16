@@ -16,7 +16,7 @@ checkpoint_dir=checkpoints
 show_usage() {
     echo "usage: $(basename $0) [--checkpoint-dir DIR] [--use-gpu true|false] "
     echo "                        modelfile config modelconfig trainfea devfea"
-    echo "                        train_numfsm dev_numfsm denfsm initmodel finalmodel"
+    echo "                        train_numfsm dev_numfsm denfsm initmodel"
 }
 
 show_help() {
@@ -32,7 +32,7 @@ show_help() {
 
 . $SLAB_ROOT/utils/parse_options.sh
 
-if [ $# -ne 10 ]; then
+if [ $# -ne 9 ]; then
     show_usage 1>&2
     exit 1
 fi
@@ -46,7 +46,6 @@ train_numfsm=$6
 dev_numfsm=$7
 denfsm=$8
 initmodel=$9
-finalmodel=$10
 
 # Check if there is a checkpoint.
 last_ckpt=$checkpoint_dir/last.jld2
@@ -54,7 +53,7 @@ last_ckpt=$checkpoint_dir/last.jld2
 
 $use_gpu && gpu_opt="--use-gpu"
 
-if [ ! -f $finalmodel ]; then
+if [ ! -f $checkpoint_dir/.done ]; then
     JULIA_CUDA_VERSION=10.2 \
     julia -t $((nworkers+1)) --project=$SLAB_ROOT $SLAB_ROOT/steps/lfmmi/scripts/train.jl \
         $ckpt_opts \
@@ -68,9 +67,9 @@ if [ ! -f $finalmodel ]; then
         $train_numfsm \
         $dev_numfsm \
         $denfsm \
-        $initmodel \
-        $finalmodel
+        $initmodel
+    date > $checkpoint_dir/.done
 else
-    echo "Model already trained in $finalmodel"
+    echo "Model already trained (best model stored in $checkpoint_dir/best.jld2)"
 fi
 

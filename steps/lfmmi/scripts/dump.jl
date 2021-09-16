@@ -20,6 +20,8 @@ function main(args)
         model = model |> gpu
     end
 
+    testmode!(model)
+
     h5open(args["features"], "r") do fin
         h5open(args["out"], "w") do fout
             bl = DumpBatchLoader(fin, args["batch-size"])

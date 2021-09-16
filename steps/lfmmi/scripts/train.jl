@@ -195,9 +195,6 @@ function parse_commandline()
         "model"
             required = true
             help = "input model saved in JLD2 format"
-        "out"
-            required = true
-            help = "output model"
     end
     s.description = """
     Train a neural network using the LF-MMI objective function.

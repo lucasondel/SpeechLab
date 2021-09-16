@@ -70,6 +70,8 @@ for dir in $traindir $devdir; do
     echo "--> Compile the numerator FSMs ($dname set)."
     logdir=$graphsdir/logs/make-alis-${dname} && mkdir -p $logdir
     slab_hmm_mkalis \
+        --edge-silprob 0.8 \
+        --between-silprob 0.1 \
         --logdir $logdir \
         --njobs 10 \
         $graphsdir/hmms.jld2 \
@@ -121,9 +123,11 @@ slab_lfmmi_train \
     $graphsdir/$(basename $traindir)_numerator_fsms.jld2 \
     $graphsdir/$(basename $devdir)_numerator_fsms.jld2 \
     $graphsdir/den_fsm.jld2 \
-    $initmodel \
-    $finalmodel | tee -a $logfile
-    echo "Finished training at $(date)." >> $logfile
+    $initmodel | tee -a $logfile
+echo "Finished training at $(date)." >> $logfile
+
+# Output of the training.
+finalmodel=$expdir/train/checkpoints/best.jld2
 
 echo "================================================================"
 echo "Generating output"

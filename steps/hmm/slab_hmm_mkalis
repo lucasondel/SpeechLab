@@ -7,13 +7,16 @@
 #######################################################################
 # Options
 
+between_silprob=0.2
+edge_silprob=0.8
 njobs=1
 logdir=$PWD
 
 #######################################################################
 
 show_usage() {
-    echo "usage: $(basename $0) [--logdir DIR] [--njobs N]"
+    echo "usage: $(basename $0) [--between-silprob P] [--edge-silprob P]"
+    echo "                       [--logdir DIR] [--njobs N]"
     echo "                       hmms lexicon trans alifsms"
 }
 
@@ -22,9 +25,11 @@ show_help() {
     echo ""
     echo "Build the alignments graphs."
     echo ""
-    echo "  -h, --help      show this help message"
-    echo "  --logdir        logging directory for the parallel environment (default: $logdir)"
-    echo "  --njobs         number of parallel jobs (default: $njobs)"
+    echo "  --between-silprob optional silence between words (default: $between_silprob)"
+    echo "  --edge-silprob    optional silence at the edge (default: $edge_silprob)"
+    echo "  -h, --help        show this help message"
+    echo "  --logdir          logging directory for the parallel environment (default: $logdir)"
+    echo "  --njobs           number of parallel jobs (default: $njobs)"
 }
 
 . $SLAB_ROOT/utils/parse_options.sh
@@ -54,6 +59,8 @@ cd $cwd
 . $SLAB_ROOT/steps/hmm/parallel_env.sh
 $parallel_cmd_alis julia --project=$SLAB_ROOT/Project.toml \
     $SLAB_ROOT/steps/hmm/scripts/makealis.jl \
+    --between-silprob $between_silprob \
+    --edge-silprob $edge_silprob \
     $hmms \
     $lexicon \
     $tmp/x\$SGE_TASK_ID \
