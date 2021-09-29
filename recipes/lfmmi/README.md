@@ -1,7 +1,7 @@
 # Lattice Free - Maximum Mutual Information (LF-MMI) training
 
 This recipe trains a neural network using sequence-discriminative
-training based on the so-called [LF-MMI](https://www.isca-speech.org/archive/Interspeech_2016/pdfs/0595.PDF)
+training based on the so-called [LF-MMI](https://www.isca-speech.org/archive/pdfs/interspeech_2016/povey16_interspeech.pdf)
 procedure.
 
 ## Data preparation
