@@ -1,6 +1,6 @@
 
 dataset = "mini_librispeech"
-expdir = "exp3"
+expdir = "exp"
 datasetsdir = "/people/ondel/Datasets"
 
 [features]
@@ -8,7 +8,8 @@ dir = "/people/ondel/Features"
 name = "kaldi_mfcc_hires_16kHz"
 
 [graphs]
-hmm_topologies = "conf/topo_unit2.toml"
+dir = "graphs"
+hmm_topologies = "topo_unit.toml"
 ngram_order = 3
 sil_sym = "<SIL>"
 oov_sym = "<UNK>"
@@ -24,8 +25,9 @@ strides = [  1,   1,   1,   1,   3]
 
 [training]
 epochs = 40
-curriculum = 1  # number of epoch of "curriculum training".
+curriculum = 1
 minibatch_size = 100
+update_freq = 1
 
 [training.scheduler]
 factor = 0.5

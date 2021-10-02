@@ -1,8 +1,0 @@
-# SPD-License-Identifier: MIT
-#
-# LF-MMI training configuration file.
-
-learning_rate = 1e-3
-mini_batch_size = 128
-epochs = 100
-
