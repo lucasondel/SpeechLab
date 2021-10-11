@@ -11,20 +11,19 @@ begin
 	Pkg.activate("../../")
 
 	md"""
-	# Lattice-free MMI training
+	# Lattice-Free MMI part II: training the model
 	*[Lucas Ondel](https://lucasondel.github.io/index), September 2021*
 
 
-	This notebook implements the creation and the training of a *Time-Delay Neural
-	Network* (TDNN) with the *Lattice-Free Maximum Mutual Information* (LF-MMI)
-	objective function.
+	This notebook is the second step of the LF-MMI recipe. It implements the creation and the training of a *Time-Delay Neural Network* (TDNN) with the *Lattice-Free Maximum Mutual Information* (LF-MMI) objective function.
+
+	Once the model is trained, the output of the neural network on the test set is dumped to an archive.
 	"""
 end
 
 # ╔═╡ ee11cbaf-73c0-45db-84f7-db9eab7b6005
 begin
 	using AutoGrad
-	using BSON
 	using CUDA
 	using Dates
 	using JLD2
@@ -32,7 +31,6 @@ begin
 	using Logging
 	using MarkovModels
 	using HDF5
-	using BSON
 	using PlutoUI
 	using Random
 	using ShortCodes
@@ -50,7 +48,7 @@ Depending on your setup, select the CUDA version you want to use. You can also d
 """
 
 # ╔═╡ 876cffca-c46b-4805-a00f-5ac30d0631fe
-ENV["JULIA_CUDA_VERSION"] = "10.2"
+ENV["JULIA_CUDA_VERSION"] = "11.3"
 
 # ╔═╡ c10dd5eb-7bbe-4427-8a04-a3219d69942f
 md"""
@@ -83,91 +81,52 @@ with_terminal() do
 	CUDA.versioninfo()
 end
 
-# ╔═╡ 89a40466-0e49-41b4-882a-20c66ad840b7
+# ╔═╡ 016eabc9-127c-4e12-98ab-8cd5004edfa0
 md"""
-We consider the directory containing this notebook to be the root directory of the experiment.
+We load the configuration file of the experiment. By default, we look for the file  `config.toml` in the root directory (i.e. the directory containing this notebook). Alternatively, when calling this notebook as a julia script, you can specify another configuration file by setting the environment variable `SPEECHLAB_LFMMI_CONFIG=/path/to/file`.
 """
 
 # ╔═╡ 20d81979-4fd8-4b51-9b27-70f54fb2f886
 rootdir = @__DIR__
 
-# ╔═╡ 016eabc9-127c-4e12-98ab-8cd5004edfa0
-md"""
-We use the file named "`config.toml`" in the root directory as the configuration
-file of this experiment. Alternatively, when calling this notebook as a julia script,
-you can specify another file by setting the environment variable
-`SPEECHLAB_LFMMI_CONFIG=/path/to/file`.
-"""
+# ╔═╡ 8ef896f4-c786-49f2-967b-72db140c933d
+configfile = get(ENV, "SPEECHLAB_LFMMI_CONFIG", joinpath(rootdir, "config.toml"))
 
 # ╔═╡ 104fc433-def8-44b1-b309-13d7683e0b33
-config = TOML.parsefile(
-	get(ENV, "SPEECHLAB_LFMMI_CONFIG", joinpath(rootdir, "config.toml"))
-)
+begin
+	@info "Reading configuration from $configfile."
+	config = TOML.parsefile(configfile)
+end
+
+# ╔═╡ 1e09402a-a8b9-4e40-8bc2-2c0c153333c8
+md"""
+We use single precision.
+"""
+
+# ╔═╡ 65590fe8-f0e0-497f-bd8b-e128e23fd60b
+const T = Float32
 
 # ╔═╡ 8bf454e4-7707-4184-a9b3-13a9d072576a
 md"""
-Here is the directory structure of the experiment:
+## Input
 
+Training with LF-MMI requires the numerator and denominator graphs (prepared by the previous step of the recipe) and the features for the training and development set.
+
+The graphs should be organized as:
 ```
 <rootdir>/
-+-- config.toml
 +-- <graphs.dir>/
-|   |   +-- <dataset>/  # This directory is prepared with "buildgraphs.jl".
-|   |   |   +-- denominator_fsm.jld2
-|   |   |   +-- dev_alignments_fsms.jld2
-|   |   |   +-- pdfid_mapping.jld2
-|   |   |   +--- train_alignments_fsms.jld2
-+-- <expdir>/
-|   +-- <dataset>/
-|   |   +-- graphs/  # This directory is prepared with "buildgraphs.jl".
-|   |   |   +-- denominator_fsm.jld2
-|   |   |   +-- dev_alignments_fsms.jld2
-|   |   |   +-- pdfid_mapping.jld2
-|   |   |   +--- train_alignments_fsms.jld2
-|   |   +-- train/   # This directory and its content are created by this notebook.
-|   |   |   +-- checkpoint.bson
-|   |   |   +-- best.bson
-|   |   |   +-- log.txt
-|   |   +-- output/  # This directory and its content are created by this notebook.
-|   |   |   +-- test.h5
+|   +-- <dataset.name>/
+|   |   +-- denominator_fsm.jld2
+|   |   +-- dev_alignments_fsms.jld2
+|   |   +-- pdfid_mapping.jld2
+|   |   +-- train_alignments_fsms.jld2
 ```
-The keys `<expdir>` and `<dataset` are taken from configuration file.
-"""
 
-# ╔═╡ 7dbf440a-8550-48fe-869d-850e9cd79656
-expdir = joinpath(rootdir, config["expdir"], config["dataset"])
-
-# ╔═╡ 8ab11e2e-af68-43d1-a766-7095719133ed
-graphsdir = joinpath(rootdir, config["graphs"]["dir"], config["dataset"])
-
-# ╔═╡ ca199db4-442f-4caf-a84e-1b4bf73e6112
-traindir = joinpath(expdir, "train")
-
-# ╔═╡ b9f56cb7-5cea-4143-b4a4-251306bef902
-outdir = joinpath(expdir, "output")
-
-# ╔═╡ 71f17a4a-88d5-449a-b0d0-fdee2956c96c
-mkpath.([traindir, outdir])
-
-# ╔═╡ 82a88680-a834-49f2-b0ef-e6dbbc645131
-md"""
-Set the numeric precision in the experiment.
-"""
-
-# ╔═╡ 3d26b72a-65ba-4e6f-9e24-041007b5c413
-T = Float32
-
-# ╔═╡ 270cb75f-62ad-4435-9932-3ff37d6db89f
-use_gpu = true
-
-# ╔═╡ aa271670-9e13-4838-968c-e15b34e47123
-md"""
-## Input features
-
-We assume the features to be stored in [HDF5](https://en.wikipedia.org/wiki/Hierarchical_Data_Format) files organized as follows:
+As for the features, they should be in [HDF5](https://en.wikipedia.org/wiki/Hierarchical_Data_Format) archive organized as follows:
 ```
 <features.dir>/
-+-- <dataset>/
++-- <dataset.name>/
 |   +-- train/
 |   |   +-- <features.name>.h5
 |   +-- dev/
@@ -175,23 +134,66 @@ We assume the features to be stored in [HDF5](https://en.wikipedia.org/wiki/Hier
 |   +-- test/
 |   |   +-- <features.name>.h5
 ```
-where `<features.dir>` and `<features.name>` are read from the configuration file.
+where `<features.dir>`, `<features.name>` and `<dataset.name>` are taken from the configuration file.
+!!! note
+	The features directory path should be absolute and not relative to the root directory.
 """
 
-# ╔═╡ 8936b2c7-68b6-4845-94b5-6512a1cb16a2
-feadir = joinpath(config["features"]["dir"], config["dataset"])
+# ╔═╡ 8ab11e2e-af68-43d1-a766-7095719133ed
+graphsdir = joinpath(rootdir, config["graphs"]["dir"], config["dataset"]["name"])
 
-# ╔═╡ 6e8c6723-d6d9-4dbe-acd7-c0575b1f832e
+# ╔═╡ 8936b2c7-68b6-4845-94b5-6512a1cb16a2
+feadir = joinpath(config["features"]["dir"], config["dataset"]["name"])
+
+# ╔═╡ 0b77b0f3-451f-41a9-a39a-da0525268ec5
 feaname = config["features"]["name"]
 
-# ╔═╡ 994a581f-f5fa-4c1c-b772-8bb6c8f5a0f5
+# ╔═╡ 252656b1-0182-4616-9909-a7bc535244cf
 featrain = joinpath(feadir, "train", feaname * ".h5")
 
-# ╔═╡ 6f336813-1d30-4dc4-a298-87019e7b7f36
+# ╔═╡ 208c0a95-43ca-420c-b349-ac12da9631e4
 feadev = joinpath(feadir, "dev", feaname * ".h5")
 
-# ╔═╡ b5aa09be-a254-4b3e-81ed-91fe31b61c0e
+# ╔═╡ 907ad799-2f95-4b68-9033-7cc1d8853f00
 featest = joinpath(feadir, "test", feaname * ".h5")
+
+# ╔═╡ 270cb75f-62ad-4435-9932-3ff37d6db89f
+use_gpu = config["training"]["use_gpu"]
+
+# ╔═╡ aa271670-9e13-4838-968c-e15b34e47123
+md"""
+## Output
+
+The notebook output the trained model and the output of the last layer on the train data.
+
+```
+<rootdir>/
++-- <experiment.dir>/
+|   +-- <dataset.name>/
+|   |   +-- <training.dir>/
+|   |   |   +-- checkpoint.jld2
+|   |   |   +-- best.jld2
+|   |   +-- <output.dir>/
+|   |   |   +-- test.h5
+```
+The keys `<experiment.dir>`, `<dataset.name>, `<training.dir>` and `<output.dir>` are taken from configuration file.
+
+!!! note
+	`best.jld2` is the model with the highest loss function on the development set whereas `checkpoint.jld2` is the model at the last epoch..
+
+"""
+
+# ╔═╡ eaa248f5-b8f3-4e3a-93a3-d4a275929878
+expdir = joinpath(config["experiment"]["dir"], config["dataset"]["name"])
+
+# ╔═╡ 6e8c6723-d6d9-4dbe-acd7-c0575b1f832e
+traindir = joinpath(expdir, config["training"]["dir"])
+
+# ╔═╡ d8de3103-bbe8-4858-8f97-ecebc3dd9103
+outdir = joinpath(expdir, config["output"]["dir"])
+
+# ╔═╡ 71f17a4a-88d5-449a-b0d0-fdee2956c96c
+mkpath.([traindir, outdir])
 
 # ╔═╡ d137c3f8-ceb5-4fbb-8e46-72bdb397d072
 md"""
@@ -203,7 +205,9 @@ We use a TDNN model with ReLU activations. The input dimension corresponds to th
 # ╔═╡ f3e1352d-9b13-4378-9b5d-6ff7f65a4005
 indim = h5open(featrain, "r") do f
 	uttid, _ = iterate(keys(f))
-	size(read(f[uttid]), 1)
+	dim = size(read(f[uttid]), 1)
+	@info "Neural network input dimension: $dim"
+	dim
 end
 
 # ╔═╡ 69f0e6a3-e620-4b55-951f-d32488a48fc5
@@ -213,7 +217,9 @@ The output dimension corresponds to the number of pdf-ids.
 
 # ╔═╡ 110a9455-f3f4-49bf-9d26-f6ed94440076
 outdim = jldopen(joinpath(graphsdir, "pdfid_mapping.jld2"), "r") do f
-	maximum( t -> t[2], f["pdfid_mapping"])
+	dim = maximum( t -> t[2], f["pdfid_mapping"])
+	@info "Neural network output dimension: $dim"
+	dim
 end
 
 # ╔═╡ a2d14acd-fed2-42b9-85dd-77c5e04b982d
@@ -726,6 +732,58 @@ md"""
 """
 
 
+# ╔═╡ 12f7ef0c-3b5a-4d24-8077-876d3718afa8
+function train_epoch!(model, batchloader, denfsm, opts, updatefreq, use_gpu)
+	trainmode!(model)
+	θ = params(model)
+	acc_loss = 0
+	acc_etime = 0
+	N = 0
+	gs = nothing
+	for (i, (batch_data, batch_nums, inlengths)) in enumerate(batchloader)
+
+		seqlengths = getlengths(config["model"], inlengths)
+		batch_dens = union(repeat([denfsm], size(batch_data, 3))...)
+
+		if use_gpu
+			batch_data = CuArray(batch_data)
+			batch_nums = MarkovModels.gpu(batch_nums)
+		end
+
+		GC.gc()
+		CUDA.reclaim()
+
+		t₀ = now()
+		L = @diff begin
+            Y = model(batch_data)
+            lfmmi_loss(Y, batch_nums, batch_dens, seqlengths)
+        end
+		t₁ = now()
+
+		@debug "[batch=$i] loss+backprop time = $((t₁ - t₀).value / 1000)"
+		gs = isnothing(gs) ? grad.([L], θ) : gs .+ grad.([L], θ)
+
+		if i % updatefreq == 0
+			update!(value.(θ), gs, opts)
+            gs = nothing
+		end
+		acc_loss += value(L)
+		N += sum(seqlengths)
+
+        if use_gpu CUDA.unsafe_free!(batch_data) end
+        batch_nums = nothing
+		L = nothing
+	end
+
+    # If the gradients of the last batches were not used, make a
+    # final update.
+    if ! isnothing(gs)
+        update!(value.(θ), gs, opts)
+    end
+
+	acc_loss / N
+end
+
 # ╔═╡ f5e0931c-66a5-4bde-b7e0-d0391a234b23
 md"""
 ### Loading data
@@ -836,57 +894,14 @@ _∇lfmmi_loss(γ_num, γ_den) = -(γ_num .- γ_den)
 lfmmi_loss(ϕ, numfsms, denfsms, seqlengths) =
 	_lfmmi_loss(ϕ, numfsms, denfsms, seqlengths)[1]
 
-# ╔═╡ 12f7ef0c-3b5a-4d24-8077-876d3718afa8
-function train_epoch!(model, batchloader, denfsm, opts, updatefreq, use_gpu)
-	trainmode!(model)
-	θ = params(model)
-	acc_loss = 0
-	acc_etime = 0
-	N = 0
-	gs = nothing
-	for (i, (batch_data, batch_nums, inlengths)) in enumerate(batchloader)
-		GC.gc()
-		CUDA.reclaim()
-
-		seqlengths = getlengths(config["model"], inlengths)
-		batch_dens = union(repeat([denfsm], size(batch_data, 3))...)
-
-		if use_gpu
-			batch_data = CuArray(batch_data)
-			batch_nums = MarkovModels.gpu(batch_nums)
-		end
-
-		L = @diff lfmmi_loss(model(batch_data), batch_nums, batch_dens,
-									seqlengths)
-		gs = isnothing(gs) ? grad.([L], θ) : gs .+ grad.([L], θ)
-
-		if i % updatefreq == 0
-			update!(value.(θ), gs, opts)
-            gs = nothing
-		end
-		acc_loss += value(L)
-		N += sum(seqlengths)
-
-		L = nothing
-	end
-
-    # If the gradients of the last batches were not used, make a
-    # final update.
-    if ! isnothing(gs)
-        update!(value.(θ), gs, opts)
-    end
-
-	acc_loss / N
-end
-
 # ╔═╡ 7222e9b4-8786-454c-9e2b-86c80bc27b29
 function validate!(model, batchloader, denfsm, use_gpu)
 	testmode!(model)
 	acc_loss = 0
 	N = 0
 	for (i, (batch_data, batch_nums, inlengths)) in enumerate(batchloader)
-		GC.gc()
-		CUDA.reclaim()
+		#GC.gc()
+		#CUDA.reclaim()
 
 		seqlengths = getlengths(config["model"], inlengths)
 		batch_dens = union(repeat([denfsm], size(batch_data, 3))...)
@@ -963,7 +978,7 @@ function train_model!(model, trainconfig, trainstate, trainfea, trainnums,
 		@info "epoch=$epoch/$epochs train_loss=$train_loss dev_loss=$dev_loss epoch_time=$((t₁ - t₀).value / 1000)"
 	end
     total_t₁ = now()
-    @info "Total training time = $((total_t₁ - total_t₀).value / 1000) seconds."
+    @debug "Total training time = $((total_t₁ - total_t₀).value / 1000) seconds."
 
 	bestmodel
 end
@@ -986,13 +1001,13 @@ model = train_model!(
 dump_output(
 	use_gpu ? model |> gpu : model |> cpu,
 	featest,
-	joinpath(expdir, "output", "test.h5"),
+	joinpath(outdir, "test.h5"),
 	config["training"]["minibatch_size"],
 	use_gpu
 )
 
 # ╔═╡ Cell order:
-# ╟─4df289c2-b460-49a6-b1b3-dac6c557397d
+# ╠═4df289c2-b460-49a6-b1b3-dac6c557397d
 # ╠═fc878252-e6cd-4663-ad45-e42cae318ffb
 # ╟─2ac818e7-7c52-4dfb-9f79-519fbce9d651
 # ╠═876cffca-c46b-4805-a00f-5ac30d0631fe
@@ -1001,25 +1016,25 @@ dump_output(
 # ╠═ee11cbaf-73c0-45db-84f7-db9eab7b6005
 # ╟─ad6986d7-71b3-49cc-92e4-dadf42953b19
 # ╠═bbde1167-ac11-4c15-8374-daa3f807cf3f
-# ╟─89a40466-0e49-41b4-882a-20c66ad840b7
-# ╠═20d81979-4fd8-4b51-9b27-70f54fb2f886
 # ╟─016eabc9-127c-4e12-98ab-8cd5004edfa0
+# ╠═20d81979-4fd8-4b51-9b27-70f54fb2f886
+# ╠═8ef896f4-c786-49f2-967b-72db140c933d
 # ╠═104fc433-def8-44b1-b309-13d7683e0b33
-# ╟─8bf454e4-7707-4184-a9b3-13a9d072576a
-# ╠═7dbf440a-8550-48fe-869d-850e9cd79656
+# ╟─1e09402a-a8b9-4e40-8bc2-2c0c153333c8
+# ╠═65590fe8-f0e0-497f-bd8b-e128e23fd60b
+# ╠═8bf454e4-7707-4184-a9b3-13a9d072576a
 # ╠═8ab11e2e-af68-43d1-a766-7095719133ed
-# ╠═ca199db4-442f-4caf-a84e-1b4bf73e6112
-# ╠═b9f56cb7-5cea-4143-b4a4-251306bef902
-# ╠═71f17a4a-88d5-449a-b0d0-fdee2956c96c
-# ╟─82a88680-a834-49f2-b0ef-e6dbbc645131
-# ╠═3d26b72a-65ba-4e6f-9e24-041007b5c413
+# ╠═8936b2c7-68b6-4845-94b5-6512a1cb16a2
+# ╠═0b77b0f3-451f-41a9-a39a-da0525268ec5
+# ╠═252656b1-0182-4616-9909-a7bc535244cf
+# ╠═208c0a95-43ca-420c-b349-ac12da9631e4
+# ╠═907ad799-2f95-4b68-9033-7cc1d8853f00
 # ╠═270cb75f-62ad-4435-9932-3ff37d6db89f
 # ╟─aa271670-9e13-4838-968c-e15b34e47123
-# ╠═8936b2c7-68b6-4845-94b5-6512a1cb16a2
+# ╠═eaa248f5-b8f3-4e3a-93a3-d4a275929878
 # ╠═6e8c6723-d6d9-4dbe-acd7-c0575b1f832e
-# ╠═994a581f-f5fa-4c1c-b772-8bb6c8f5a0f5
-# ╠═6f336813-1d30-4dc4-a298-87019e7b7f36
-# ╠═b5aa09be-a254-4b3e-81ed-91fe31b61c0e
+# ╠═d8de3103-bbe8-4858-8f97-ecebc3dd9103
+# ╠═71f17a4a-88d5-449a-b0d0-fdee2956c96c
 # ╟─d137c3f8-ceb5-4fbb-8e46-72bdb397d072
 # ╠═f3e1352d-9b13-4378-9b5d-6ff7f65a4005
 # ╟─69f0e6a3-e620-4b55-951f-d32488a48fc5

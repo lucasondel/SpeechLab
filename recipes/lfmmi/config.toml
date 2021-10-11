@@ -1,20 +1,24 @@
 
-dataset = "mini_librispeech"
-expdir = "exp"
-datasetsdir = "/people/ondel/Datasets"
+[dataset]
+dir = "/people/ondel/Datasets"
+name = "wsj"
+
+[experiment]
+dir = "exp"
 
 [features]
 dir = "/people/ondel/Features"
 name = "kaldi_mfcc_hires_16kHz"
 
 [graphs]
-dir = "graphs"
+dir = "graphs_test"
 hmm_topologies = "topo_unit.toml"
 ngram_order = 3
 sil_sym = "<SIL>"
 oov_sym = "<UNK>"
 between_silprob = 0.2
 edge_silprob = 0.8
+sample = true
 
 [model]
 dropout = 0.2
@@ -24,10 +28,12 @@ hidden-dims = [384, 384, 384, 384, 384]
 strides = [  1,   1,   1,   1,   3]
 
 [training]
-epochs = 40
+dir = "train"
+epochs = 20
 curriculum = 1
 minibatch_size = 100
 update_freq = 1
+use_gpu = true
 
 [training.scheduler]
 factor = 0.5
@@ -39,3 +45,6 @@ min_learning_rate = 1e-5
 learning_rate = 1e-3
 beta1 = 0.9
 beta2 = 0.999
+
+[output]
+dir = "output"
